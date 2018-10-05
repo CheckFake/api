@@ -7,6 +7,8 @@ name = "pypi"
 django = "*"
 requests = "*"
 "psycopg2-binary" = "*"
+dj-database-url = "*"
+django-mailgun = "*"
 
 [dev-packages]
 

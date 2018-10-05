@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
 import os
+import dj_database_url
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -20,12 +21,24 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '$a^7vw@ktn0mbnbd5(vs4em-(yy1ufrx$=g@r6ihbc#qj1-5#1'
+SECRET_KEY = os.getenv('SECRET_KEY', '$a^7vw@ktn0mbnbd5(vs4em-(yy1ufrx$=g@r6ihbc#qj1-5#1')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_ENV', 'prod') == 'dev'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['fakenewsdetector.augendre.info', 'web', 'fakenewsdetector', '127.0.0.1']
+if DEBUG:
+    ALLOWED_HOSTS.extend([
+        'localhost',
+        os.getenv('CURRENT_IP', '192.168.1.27')
+    ])
+host = os.getenv('HOST', None)
+if host:
+    ALLOWED_HOSTS.append(host)
+
+ADMINS = [('Gabriel', os.getenv('ADMIN_EMAIL')), ]
+SERVER_EMAIL = os.getenv('SERVER_EMAIL')
+EMAIL_SUBJECT_PREFIX = '[Fake News Detector API] '
 
 
 # Application definition
@@ -76,10 +89,7 @@ WSGI_APPLICATION = 'fake_news_detector_api.wsgi.application'
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    }
+    'default': dj_database_url.config(default='sqlite:///' + os.path.join(BASE_DIR, 'db.sqlite3'), conn_max_age=600)
 }
 
 
@@ -105,9 +115,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'fr-fr'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Paris'
 
 USE_I18N = True
 
@@ -120,3 +130,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+EMAIL_BACKEND = 'django_mailgun.MailgunBackend'
+MAILGUN_ACCESS_KEY = os.getenv('MAILGUN_ACCESS_KEY', '')
+MAILGUN_SERVER_NAME = os.getenv('MAILGUN_SERVER_NAME', '')
