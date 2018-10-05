@@ -9,6 +9,7 @@ requests = "*"
 "psycopg2-binary" = "*"
 dj-database-url = "*"
 django-mailgun = "*"
+gunicorn = "*"
 
 [dev-packages]
 
