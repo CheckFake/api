@@ -18,4 +18,5 @@ from . import views
 
 urlpatterns = [
     path('page', views.web_page_score_view),
+    path('ping', views.ping_view),
 ]

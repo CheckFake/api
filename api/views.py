@@ -9,3 +9,9 @@ def web_page_score_view(request):
         return None
 
     return JsonResponse(WebPage.from_url(url=web_page_url).to_dict())
+
+
+def ping_view(request):
+    return JsonResponse({
+        'status': 'alive'
+    })
