@@ -3,13 +3,22 @@ import statistics
 
 from django.db import models
 
+from api.utils import ChoiceEnum
+
 
 class WebPage(models.Model):
-    CURRENT_SCORES_VERSION = 1
+    CURRENT_SCORES_VERSION = 2
+
+    class Categories(ChoiceEnum):
+        SCIENCE = 'science'
+        POLITICS = 'politics'
+        NEWS = 'news'
+        UNKNOWN = 'unknown'
 
     url = models.URLField(unique=True)
     domain_score = models.PositiveIntegerField(blank=True, null=True)
     author_score = models.PositiveIntegerField(blank=True, null=True)
+    category = models.CharField(max_length=20, choices=Categories.choices(), null=True)
     scores_version = models.PositiveIntegerField()
 
     @property
@@ -23,11 +32,13 @@ class WebPage(models.Model):
         self.domain_score = random.randint(0, 100)
         self.author_score = random.randint(0, 100)
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
+        self.category = random.choice(self.Categories.choices())[0]
         self.save()
 
     def to_dict(self):
         fields_to_serialize = ['url', 'global_score']
         self_serialized = {field: getattr(self, field) for field in fields_to_serialize}
+        self_serialized['category'] = self.get_category_display()
         scores = ['domain_score', 'author_score']
         self_serialized['scores'] = {field: getattr(self, field) for field in scores}
 
