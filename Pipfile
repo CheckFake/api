@@ -10,6 +10,7 @@ requests = "*"
 dj-database-url = "*"
 django-mailgun = "*"
 gunicorn = "*"
+tldextract = "*"
 
 [dev-packages]
 

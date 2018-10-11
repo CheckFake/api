@@ -1,6 +1,9 @@
+import json
+import os
 import random
 import statistics
 
+import tldextract
 from django.db import models
 
 from api.utils import ChoiceEnum
@@ -29,11 +32,68 @@ class WebPage(models.Model):
         return statistics.mean(scores)
 
     def compute_scores(self):
-        self.domain_score = random.randint(0, 100)
         self.author_score = random.randint(0, 100)
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
-        self.category = random.choice(self.Categories.choices())[0]
+
+        category = None
+        domain_score = None
+
+        open_sources_score_mapping = {
+            'fake': 0,
+            'satire': 0,
+            'bias': 0,
+            'conspiracy': 0,
+            'rumor': 0,
+            'state': 0,
+            'junksci': 0,
+            'hate': 0,
+            'clickbait': 0,
+            'unreliable': 0,
+            'political': 40,
+            'reliable': 80,
+        }
+
+        open_sources_category_mapping = {
+            'fake': self.Categories.NEWS,
+            'satire': self.Categories.NEWS,
+            'bias': self.Categories.NEWS,
+            'conspiracy': self.Categories.NEWS,
+            'rumor': self.Categories.NEWS,
+            'state': self.Categories.NEWS,
+            'junksci': self.Categories.SCIENCE,
+            'hate': self.Categories.NEWS,
+            'clickbait': self.Categories.NEWS,
+            'unreliable': self.Categories.NEWS,
+            'political': self.Categories.POLITICS,
+            'reliable': None,
+        }
+
+        with open('api/external_data/open_sources.json') as open_sources_json:
+            open_sources = json.load(open_sources_json)
+            tld_extract = tldextract.TLDExtract(
+                cache_file='api/external_data/public_suffixes_list.dat',
+                include_psl_private_domains=True
+            )
+            url_extraction = tld_extract(self.url)
+            base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
+            print(base_domain)
+            if base_domain in open_sources:
+                open_sources_type = open_sources[base_domain]['type']
+                category = open_sources_category_mapping[open_sources_type]
+                domain_score = open_sources_score_mapping[open_sources_type]
+
+        if domain_score is not None:
+            self.domain_score = domain_score
+        else:
+            self.domain_score = random.randint(0, 100)
+
+        if category is not None:
+            self.category = category
+        else:
+            self.category = random.choice(self.Categories.choices())[0]
+
         self.save()
+        return self
 
     def to_dict(self):
         fields_to_serialize = ['url', 'global_score']
@@ -51,10 +111,9 @@ class WebPage(models.Model):
         if existing and existing.scores_version == WebPage.CURRENT_SCORES_VERSION:
             return existing
         elif not existing:
-            existing = cls.objects.create(url=url, scores_version=WebPage.CURRENT_SCORES_VERSION)
+            existing = cls(url=url, scores_version=WebPage.CURRENT_SCORES_VERSION)
 
-        existing.compute_scores()
-        return existing
+        return existing.compute_scores()
 
     def __str__(self):
         return self.url

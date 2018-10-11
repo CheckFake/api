@@ -114,3 +114,4 @@ fabric.properties
 *.sqlite3
 *.pyc
 __pycache__
+public_suffixes_list.dat
