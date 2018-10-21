@@ -1,10 +1,11 @@
+import datetime
 import json
-import os
 import random
 import statistics
 
 import tldextract
 from django.db import models
+from django.utils import timezone
 
 from api.utils import ChoiceEnum
 
@@ -23,6 +24,8 @@ class WebPage(models.Model):
     author_score = models.PositiveIntegerField(blank=True, null=True)
     category = models.CharField(max_length=20, choices=Categories.choices(), null=True)
     scores_version = models.PositiveIntegerField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     @property
     def global_score(self):
@@ -108,8 +111,11 @@ class WebPage(models.Model):
     def from_url(cls, url):
         existing = cls.objects.filter(url=url).first()
 
-        if existing and existing.scores_version == WebPage.CURRENT_SCORES_VERSION:
+        if (existing
+                and existing.scores_version == WebPage.CURRENT_SCORES_VERSION
+                and existing.updated_at > timezone.now() - datetime.timedelta(days=7)):
             return existing
+
         elif not existing:
             existing = cls(url=url, scores_version=WebPage.CURRENT_SCORES_VERSION)
 
