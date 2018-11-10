@@ -1,4 +1,4 @@
-FROM python:3.7-alpine
+FROM python:3.6-alpine
 
 RUN apk add --no-cache postgresql-libs git libffi-dev && \
     apk add --no-cache --virtual .build-deps gcc musl-dev postgresql-dev tzdata && \
