@@ -4,7 +4,7 @@ from api.models import WebPage
 
 
 def web_page_score_view(request):
-    web_page_url = request.GET.get('url')
+    web_page_url = request.GET.get('url').lower()
     if not web_page_url:
         return JsonResponse({
             'status': 'error',
