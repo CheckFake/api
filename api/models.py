@@ -9,6 +9,14 @@ from django.utils import timezone
 
 from api.utils import ChoiceEnum
 
+import urllib.request
+from urllib.request import urlopen, Request
+from urllib.parse import urlparse, parse_qs
+from bs4 import BeautifulSoup
+import requests
+import re
+from goose3 import Goose
+
 
 class WebPage(models.Model):
     CURRENT_SCORES_VERSION = 3
@@ -38,7 +46,41 @@ class WebPage(models.Model):
         return statistics.mean(scores)
 
     def compute_scores(self):
-        self.author_score = random.randint(0, 100)
+
+        # Ask the URL of the news
+        originalURL = self.url
+        parsed_uri = urlparse(originalURL)
+
+        # Extract the title and the text of the article
+        g = Goose()
+        article = g.extract(url=originalURL)
+        #print("Title : {}".format(article.title))
+        #print("Text : {}".format(article.cleaned_text))
+        #print("Date : {}".format(article.publish_datetime_utc))
+
+        title = article.title
+
+        # Construct the url for the GET request
+        title = title.replace(" ", "-")
+        urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr%3A1%2Ccd_min" + (article.publish_datetime_utc.date - datetime.timedelta(days=7))  + "%2Ccd_max" + (article.publish_datetime_utc.date + datetime.timedelta(days=7)) 
+        #print("URL : {}".format(urlRequest))
+
+        # GET request
+        page = requests.get(urlRequest)
+        soup = BeautifulSoup(page.content, "lxml")
+        for link in soup.find_all("a",href=re.compile("(?<=/url)(\?|\&)q=(htt.*://.*)")):
+            linkedURL = parse_qs(urlparse(link['href']).query)['q'][0]
+
+            if "webcache" not in linkedURL and parsed_uri.netloc not in linkedURL:
+                article = g.extract(url=linkedURL)
+                print(article.title)
+                article.cleaned_text
+                print(linkedURL)
+                print()
+
+        #TODO
+        self.content_score = random.randint(0, 100)
+
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
 
         tld_extract = tldextract.TLDExtract(
@@ -49,8 +91,6 @@ class WebPage(models.Model):
         base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
         print(base_domain)
         self.base_domain = base_domain
-
-        self.content_score = random.randint(0, 100)
 
         self.save()
         return self
