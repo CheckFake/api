@@ -51,20 +51,35 @@ class WebPage(models.Model):
         originalURL = self.url
         parsed_uri = urlparse(originalURL)
 
+        print("Take url")
+
         # Extract the title and the text of the article
         g = Goose()
         article = g.extract(url=originalURL)
+
+        print("Extraction URL")
         #print("Title : {}".format(article.title))
         #print("Text : {}".format(article.cleaned_text))
         #print("Date : {}".format(article.publish_datetime_utc))
 
         title = article.title
+        date = ''
+        dateList = article.publish_datetime_utc[0:10].split('-')
+        for i in range(len(dateList)):
+            date += dateList[len(dateList) - 1 - i]
+            if i != (len(dateList) - 1):
+                date += '-'
 
+
+        print("Construct url request")
         # Construct the url for the GET request
         title = title.replace(" ", "-")
-        urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr%3A1%2Ccd_min" + (article.publish_datetime_utc.date - datetime.timedelta(days=7))  + "%2Ccd_max" + (article.publish_datetime_utc.date + datetime.timedelta(days=7)) 
-        #print("URL : {}".format(urlRequest))
+        print("Date of the article : {}".format(article.publish_datetime_utc))
+        urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr%3A1%2Ccd_min" + (date - datetime.timedelta(days=7))  + "%2Ccd_max" + (date + datetime.timedelta(days=7)) 
+        print("URL constructed")
+        print("URL : {}".format(urlRequest))
 
+        print("Execute the request")
         # GET request
         page = requests.get(urlRequest)
         soup = BeautifulSoup(page.content, "lxml")

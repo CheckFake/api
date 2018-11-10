@@ -12,6 +12,7 @@ django-mailgun = "*"
 gunicorn = "*"
 tldextract = "*"
 "bs4" = "*"
+"goose3" = "*"
 
 [dev-packages]
 
