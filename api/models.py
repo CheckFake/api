@@ -16,6 +16,8 @@ from bs4 import BeautifulSoup
 import requests
 import re
 from goose3 import Goose
+from collections import Counter
+from nltk.tokenize import RegexpTokenizer
 
 
 class WebPage(models.Model):
@@ -54,6 +56,19 @@ class WebPage(models.Model):
         article = g.extract(url=originalURL)
         title = article.title
 
+        print("1")
+        tokenizer = RegexpTokenizer(r'\w+')
+        print("2")
+        tokens = tokenizer.tokenize(article.cleaned_text)
+        print("3")
+        nonPunct = re.compile('.*[A-Za-z0-9].*')
+        print("4")
+        filtered = [w for w in tokens if nonPunct.match(w)]
+        print("5")
+        counts = Counter(filtered)
+        print("6")
+        print(counts)
+
         # Construct the url for the GET request
         title = title.replace(" ", "-")
         lowDate = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
@@ -62,7 +77,6 @@ class WebPage(models.Model):
         newLowDate = lowDate.strftime('%m/%d/%Y')
         newHighDate = highDate.strftime('%m/%d/%Y')
 
-        #urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr%3A1%2Ccd_min" + newLowDate  + "%2Ccd_max" + newHighDate
         urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr:1,cd_min:" + newLowDate  + ",cd_max:" + newHighDate
         print("URL constructed")
         print("URL : {}".format(urlRequest))
@@ -76,10 +90,10 @@ class WebPage(models.Model):
 
             if "webcache" not in linkedURL and parsed_uri.netloc not in linkedURL:
                 article = g.extract(url=linkedURL)
-                print(article.title)
-                print(article.publish_datetime_utc)
+                print("Name of the article: {}".format(article.title))
+                print("Pubication date: {}".format(article.publish_datetime_utc))
                 article.cleaned_text
-                print(linkedURL)
+                print("URL of the article: {}".format(linkedURL))
                 print()
 
         #TODO
