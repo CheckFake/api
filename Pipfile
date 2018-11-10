@@ -11,6 +11,7 @@ dj-database-url = "*"
 django-mailgun = "*"
 gunicorn = "*"
 tldextract = "*"
+"bs4" = "*"
 
 [dev-packages]
 
