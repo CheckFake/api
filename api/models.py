@@ -46,38 +46,24 @@ class WebPage(models.Model):
         return statistics.mean(scores)
 
     def compute_scores(self):
-
-        # Ask the URL of the news
         originalURL = self.url
         parsed_uri = urlparse(originalURL)
-
-        print("Take url")
 
         # Extract the title and the text of the article
         g = Goose()
         article = g.extract(url=originalURL)
-
-        print("Extraction URL")
-        #print("Title : {}".format(article.title))
-        #print("Text : {}".format(article.cleaned_text))
-        #print("Date : {}".format(article.publish_datetime_utc))
-
         title = article.title
 
-
-        print("Construct url request")
         # Construct the url for the GET request
         title = title.replace(" ", "-")
+        lowDate = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
+        highDate = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
 
-        date = article.publish_date
-        new_date = ""
-        date_list = date[0:10].split('-')
-        for i in range(len(date_list)):
-            new_date+=(date_list[len(date_list) - i-1])
-            if i != (len(date_list)-1):
-                new_date += '-'
-        fmt = '%d-%m-%Y'
-        urlRequest = "https://www.google.fr/search?q=" + str(title) #+ "&tbs=cdr%3A1%2Ccd_min" + (datetime.datetime.strptime(new_date, fmt) - datetime.timedelta(days=7))  + "%2Ccd_max" + (datetime.datetime.strptime(new_date, fmt) + datetime.timedelta(days=7)) 
+        newLowDate = lowDate.strftime('%m/%d/%Y')
+        newHighDate = highDate.strftime('%m/%d/%Y')
+
+        #urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr%3A1%2Ccd_min" + newLowDate  + "%2Ccd_max" + newHighDate
+        urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr:1,cd_min:" + newLowDate  + ",cd_max:" + newHighDate
         print("URL constructed")
         print("URL : {}".format(urlRequest))
 
@@ -91,6 +77,7 @@ class WebPage(models.Model):
             if "webcache" not in linkedURL and parsed_uri.netloc not in linkedURL:
                 article = g.extract(url=linkedURL)
                 print(article.title)
+                print(article.publish_datetime_utc)
                 article.cleaned_text
                 print(linkedURL)
                 print()
