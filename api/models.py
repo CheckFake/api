@@ -1,17 +1,17 @@
 import datetime
-import json
 import random
 import statistics
 
 import tldextract
 from django.db import models
+from django.db.models import Avg
 from django.utils import timezone
 
 from api.utils import ChoiceEnum
 
 
 class WebPage(models.Model):
-    CURRENT_SCORES_VERSION = 2
+    CURRENT_SCORES_VERSION = 3
 
     class Categories(ChoiceEnum):
         SCIENCE = 'science'
@@ -20,12 +20,15 @@ class WebPage(models.Model):
         UNKNOWN = 'unknown'
 
     url = models.URLField(unique=True)
-    domain_score = models.PositiveIntegerField(blank=True, null=True)
-    author_score = models.PositiveIntegerField(blank=True, null=True)
-    category = models.CharField(max_length=20, choices=Categories.choices(), null=True)
+    content_score = models.PositiveIntegerField(blank=True, null=True)
+    base_domain = models.CharField(max_length=250)
     scores_version = models.PositiveIntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def site_score(self):
+        return (WebPage.objects.filter(base_domain=self.base_domain).aggregate(site_score=Avg('content_score')))['site_score']
 
     @property
     def global_score(self):
@@ -38,62 +41,16 @@ class WebPage(models.Model):
         self.author_score = random.randint(0, 100)
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
 
-        category = None
-        domain_score = None
+        tld_extract = tldextract.TLDExtract(
+            cache_file='api/external_data/public_suffixes_list.dat',
+            include_psl_private_domains=True
+        )
+        url_extraction = tld_extract(self.url)
+        base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
+        print(base_domain)
+        self.base_domain = base_domain
 
-        open_sources_score_mapping = {
-            'fake': 0,
-            'satire': 0,
-            'bias': 0,
-            'conspiracy': 0,
-            'rumor': 0,
-            'state': 0,
-            'junksci': 0,
-            'hate': 0,
-            'clickbait': 0,
-            'unreliable': 0,
-            'political': 40,
-            'reliable': 80,
-        }
-
-        open_sources_category_mapping = {
-            'fake': self.Categories.NEWS,
-            'satire': self.Categories.NEWS,
-            'bias': self.Categories.NEWS,
-            'conspiracy': self.Categories.NEWS,
-            'rumor': self.Categories.NEWS,
-            'state': self.Categories.NEWS,
-            'junksci': self.Categories.SCIENCE,
-            'hate': self.Categories.NEWS,
-            'clickbait': self.Categories.NEWS,
-            'unreliable': self.Categories.NEWS,
-            'political': self.Categories.POLITICS,
-            'reliable': None,
-        }
-
-        with open('api/external_data/open_sources.json') as open_sources_json:
-            open_sources = json.load(open_sources_json)
-            tld_extract = tldextract.TLDExtract(
-                cache_file='api/external_data/public_suffixes_list.dat',
-                include_psl_private_domains=True
-            )
-            url_extraction = tld_extract(self.url)
-            base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
-            print(base_domain)
-            if base_domain in open_sources:
-                open_sources_type = open_sources[base_domain]['type']
-                category = open_sources_category_mapping[open_sources_type]
-                domain_score = open_sources_score_mapping[open_sources_type]
-
-        if domain_score is not None:
-            self.domain_score = domain_score
-        else:
-            self.domain_score = random.randint(0, 100)
-
-        if category is not None:
-            self.category = category
-        else:
-            self.category = random.choice(self.Categories.choices())[0]
+        self.content_score = random.randint(0, 100)
 
         self.save()
         return self
@@ -101,8 +58,7 @@ class WebPage(models.Model):
     def to_dict(self):
         fields_to_serialize = ['url', 'global_score']
         self_serialized = {field: getattr(self, field) for field in fields_to_serialize}
-        self_serialized['category'] = self.get_category_display()
-        scores = ['domain_score', 'author_score']
+        scores = ['content_score', 'site_score']
         self_serialized['scores'] = {field: getattr(self, field) for field in scores}
 
         return self_serialized
