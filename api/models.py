@@ -62,7 +62,14 @@ class WebPage(models.Model):
 
         # Construct the url for the GET request
         title = title.replace(" ", "-")
-        urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr%3A1%2Ccd_min" + (article.publish_datetime_utc.date - datetime.timedelta(days=7))  + "%2Ccd_max" + (article.publish_datetime_utc.date + datetime.timedelta(days=7)) 
+
+        new_date = ""
+        date_list = date[0:10].split('-')
+        for i in range(len(date_list)):
+            new_date+=(date_list[len(date_list) - i-1])
+            if(i != len(date_list)-1):
+                new_date += '-'
+        urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr%3A1%2Ccd_min" + new_date - datetime.timedelta(days=7))  + "%2Ccd_max" + (article.publish_datetime_utc.date + datetime.timedelta(days=7)) 
         #print("URL : {}".format(urlRequest))
 
         # GET request
