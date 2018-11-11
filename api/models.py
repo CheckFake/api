@@ -18,6 +18,7 @@ import re
 from goose3 import Goose
 from collections import Counter
 from nltk.tokenize import RegexpTokenizer
+from nltk.stem.snowball import SnowballStemmer
 
 
 class WebPage(models.Model):
@@ -47,6 +48,17 @@ class WebPage(models.Model):
         scores = list(map(lambda x: getattr(self, x), fields))
         return statistics.mean(scores)
 
+    @classmethod
+    def tokens(text):
+        tokenizer = RegexpTokenizer(r'\w+')
+        tokens = tokenizer.tokenize(text)
+        nonPunct = re.compile('.*[A-Za-z0-9].*')
+        filtered = [w for w in tokens if (nonPunct.match(w) and len(w) > 2)]
+        stemmer = SnowballStemmer("french")
+        for i in range(len(filtered)):
+            filtered[i] = stemmer.stem(filtered[i])
+        return filtered
+
     def compute_scores(self):
         originalURL = self.url
         parsed_uri = urlparse(originalURL)
@@ -56,20 +68,11 @@ class WebPage(models.Model):
         article = g.extract(url=originalURL)
         title = article.title
 
-        print("1")
-        tokenizer = RegexpTokenizer(r'\w+')
-        print("2")
-        tokens = tokenizer.tokenize(article.cleaned_text)
-        print("3")
-        nonPunct = re.compile('.*[A-Za-z0-9].*')
-        print("4")
-        filtered = [w for w in tokens if nonPunct.match(w)]
-        print("5")
-        counts = Counter(filtered)
-        print("6")
-        print(counts)
+        print("Write counter:")
+        print(Counter(tokens(article.cleaned_text)))
+        print("Counter written!!!")
 
-        # Construct the url for the GET request
+        # Make the url for the GET request
         title = title.replace(" ", "-")
         lowDate = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
         highDate = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
@@ -78,8 +81,7 @@ class WebPage(models.Model):
         newHighDate = highDate.strftime('%m/%d/%Y')
 
         urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr:1,cd_min:" + newLowDate  + ",cd_max:" + newHighDate
-        print("URL constructed")
-        print("URL : {}".format(urlRequest))
+        print("URL Get : {}".format(urlRequest))
 
         print("Execute the request")
         # GET request
@@ -94,6 +96,8 @@ class WebPage(models.Model):
                 print("Pubication date: {}".format(article.publish_datetime_utc))
                 article.cleaned_text
                 print("URL of the article: {}".format(linkedURL))
+                print()
+                print(Counter(tokens(article.cleaned_text)))
                 print()
 
         #TODO
