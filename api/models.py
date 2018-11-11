@@ -43,7 +43,7 @@ class WebPage(models.Model):
         scores = list(map(lambda x: getattr(self, x), fields))
         return statistics.mean(scores)
 
-    @classmethod
+    @staticmethod
     def tokens(text):
         tokenizer = RegexpTokenizer(r'\w+')
         tokens = tokenizer.tokenize(text)
@@ -55,8 +55,10 @@ class WebPage(models.Model):
         return filtered
 
     def compute_scores(self):
+        logger.debug("Start compute_scores")
         original_url = self.url
         parsed_uri = urlparse(original_url)
+        logger.debug("URL parsed")
 
         # Extract the title and the text of the article
         g = Goose()
@@ -64,25 +66,29 @@ class WebPage(models.Model):
         title = article.title
 
         logger.debug("Write counter:")
-        print(Counter(tokens(article.cleaned_text)))
+        article_counter = Counter(self.tokens(article.cleaned_text))
+        logger.debug("Tokens for article to review : %s", Counter(self.tokens(article.cleaned_text)))
         logger.debug("Counter written!!!")
-
-        # Make the url for the GET request
-        title = title.replace(" ", "-")
-        lowDate = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
-        highDate = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
+        logger.debug("Youpiiiiiiii!!")
 
         # Construct the url for the GET request
         title = str(title.replace(" ", "-"))
-        low_date = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
-        high_date = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
 
-        new_low_date = low_date.strftime('%m/%d/%Y')
-        new_high_date = high_date.strftime('%m/%d/%Y')
+        if article.publish_datetime_utc != None:
+            low_date = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
+            high_date = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
 
-        url_request = f"https://www.google.fr/search?q={title}&tbs=cdr:1,cd_min:{new_low_date},cd_max:{new_high_date}"
-        logger.debug("URL constructed")
-        logger.debug("URL : {}".format(url_request))
+            new_low_date = low_date.strftime('%m/%d/%Y')
+            new_high_date = high_date.strftime('%m/%d/%Y')
+
+            url_request = f"https://www.google.fr/search?q={title}&tbs=cdr:1,cd_min:{new_low_date},cd_max:{new_high_date}"
+            logger.debug("URL constructed")
+            logger.debug("URL : {}".format(url_request))
+        else:
+            url_request = f"https://www.google.fr/search?q={title}"
+            logger.debug("URL constructed without date")
+            logger.debug("URL : {}".format(url_request))
+
 
         logger.debug("Execute the request")
         # GET request
@@ -93,13 +99,13 @@ class WebPage(models.Model):
 
             if "webcache" not in linked_url and parsed_uri.netloc not in linked_url:
                 article = g.extract(url=linked_url)
-                logger.debug("Name of the article:", article.title)
-                logger.debug("Pubication date:", article.publish_datetime_utc)
-                logger.debug("Article content:\n", article.cleaned_text)
-                logger.debug("URL of the article:", linked_url)
-                logger.debug()
-                print(Counter(tokens(article.cleaned_text)))
-                print()
+                logger.debug("Name of the article: %s", article.title)
+                logger.debug("Pubication date: %s", article.publish_datetime_utc)
+                logger.debug("URL of the article: %s", linked_url)
+                logger.debug(Counter(self.tokens(article.cleaned_text)))
+                new_article_counter = Counter(self.tokens(article.cleaned_text))
+                shared_items = {k for k in article_counter if k in new_article_counter}
+                logger.debug("Length of same words : %s", len(shared_items))
 
         # TODO
         self.content_score = random.randint(0, 100)
