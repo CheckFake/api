@@ -12,7 +12,7 @@ django-mailgun = "*"
 gunicorn = "*"
 tldextract = "*"
 "goose3" = "*"
-"bs4" = "*"
+"beautifulsoup4" = "*"
 
 
 [dev-packages]
