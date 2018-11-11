@@ -1,4 +1,5 @@
 import datetime
+import logging
 import random
 import re
 import statistics
@@ -13,6 +14,8 @@ from django.db.models import Avg
 from django.utils import timezone
 from goose3 import Goose
 from nltk.tokenize import RegexpTokenizer
+
+logger = logging.getLogger(__name__)
 
 
 class WebPage(models.Model):
@@ -48,18 +51,18 @@ class WebPage(models.Model):
         article = g.extract(url=original_url)
         title = article.title
 
-        print("1")
+        logger.debug("1")
         tokenizer = RegexpTokenizer(r'\w+')
-        print("2")
+        logger.debug("2")
         tokens = tokenizer.tokenize(article.cleaned_text)
-        print("3")
+        logger.debug("3")
         non_punct = re.compile('.*[A-Za-z0-9].*')
-        print("4")
+        logger.debug("4")
         filtered = [w for w in tokens if non_punct.match(w)]
-        print("5")
+        logger.debug("5")
         counts = Counter(filtered)
-        print("6")
-        print(counts)
+        logger.debug("6")
+        logger.debug(counts)
 
         # Construct the url for the GET request
         title = str(title.replace(" ", "-"))
@@ -70,10 +73,10 @@ class WebPage(models.Model):
         new_high_date = high_date.strftime('%m/%d/%Y')
 
         url_request = f"https://www.google.fr/search?q={title}&tbs=cdr:1,cd_min:{new_low_date},cd_max:{new_high_date}"
-        print("URL constructed")
-        print("URL : {}".format(url_request))
+        logger.debug("URL constructed")
+        logger.debug("URL : {}".format(url_request))
 
-        print("Execute the request")
+        logger.debug("Execute the request")
         # GET request
         page = requests.get(url_request)
         soup = BeautifulSoup(page.content, "lxml")
@@ -82,11 +85,11 @@ class WebPage(models.Model):
 
             if "webcache" not in linked_url and parsed_uri.netloc not in linked_url:
                 article = g.extract(url=linked_url)
-                print("Name of the article:", article.title)
-                print("Pubication date:", article.publish_datetime_utc)
-                print("Article content:\n", article.cleaned_text)
-                print("URL of the article:", linked_url)
-                print()
+                logger.debug("Name of the article:", article.title)
+                logger.debug("Pubication date:", article.publish_datetime_utc)
+                logger.debug("Article content:\n", article.cleaned_text)
+                logger.debug("URL of the article:", linked_url)
+                logger.debug()
 
         # TODO
         self.content_score = random.randint(0, 100)
@@ -99,7 +102,7 @@ class WebPage(models.Model):
         )
         url_extraction = tld_extract(self.url)
         base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
-        print(base_domain)
+        logger.debug(f"Base domain found {base_domain}")
         self.base_domain = base_domain
 
         self.save()

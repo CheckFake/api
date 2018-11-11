@@ -112,6 +112,30 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
+# Logging
+LOG_LEVEL = 'DEBUG' if DEBUG else 'INFO'
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[%(asctime)s] [%(process)d] [%(levelname)s] %(module)s - %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose'
+        },
+    },
+    'loggers': {
+        'api': {
+            'handlers': ['console'],
+            'level': LOG_LEVEL
+        },
+    },
+}
+
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
 
