@@ -1,23 +1,20 @@
 import datetime
 import random
+import re
 import statistics
+from collections import Counter
+from urllib.parse import urlparse, parse_qs
 
+import requests
 import tldextract
+from bs4 import BeautifulSoup
 from django.db import models
 from django.db.models import Avg
 from django.utils import timezone
+from goose3 import Goose
+from nltk.tokenize import RegexpTokenizer
 
 from api.utils import ChoiceEnum
-
-import urllib.request
-from urllib.request import urlopen, Request
-from urllib.parse import urlparse, parse_qs
-from bs4 import BeautifulSoup
-import requests
-import re
-from goose3 import Goose
-from collections import Counter
-from nltk.tokenize import RegexpTokenizer
 
 
 class WebPage(models.Model):
