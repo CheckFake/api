@@ -14,17 +14,9 @@ from django.utils import timezone
 from goose3 import Goose
 from nltk.tokenize import RegexpTokenizer
 
-from api.utils import ChoiceEnum
-
 
 class WebPage(models.Model):
     CURRENT_SCORES_VERSION = 3
-
-    class Categories(ChoiceEnum):
-        SCIENCE = 'science'
-        POLITICS = 'politics'
-        NEWS = 'news'
-        UNKNOWN = 'unknown'
 
     url = models.URLField(unique=True)
     content_score = models.PositiveIntegerField(blank=True, null=True)
