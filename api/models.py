@@ -27,7 +27,10 @@ class WebPage(models.Model):
 
     @property
     def site_score(self):
-        return (WebPage.objects.filter(base_domain=self.base_domain).aggregate(site_score=Avg('content_score')))['site_score']
+        return (WebPage.objects
+                .filter(base_domain=self.base_domain)
+                .aggregate(site_score=Avg('content_score'))
+                )['site_score']
 
     @property
     def global_score(self):
@@ -37,12 +40,12 @@ class WebPage(models.Model):
         return statistics.mean(scores)
 
     def compute_scores(self):
-        originalURL = self.url
-        parsed_uri = urlparse(originalURL)
+        original_url = self.url
+        parsed_uri = urlparse(original_url)
 
         # Extract the title and the text of the article
         g = Goose()
-        article = g.extract(url=originalURL)
+        article = g.extract(url=original_url)
         title = article.title
 
         print("1")
@@ -50,42 +53,42 @@ class WebPage(models.Model):
         print("2")
         tokens = tokenizer.tokenize(article.cleaned_text)
         print("3")
-        nonPunct = re.compile('.*[A-Za-z0-9].*')
+        non_punct = re.compile('.*[A-Za-z0-9].*')
         print("4")
-        filtered = [w for w in tokens if nonPunct.match(w)]
+        filtered = [w for w in tokens if non_punct.match(w)]
         print("5")
         counts = Counter(filtered)
         print("6")
         print(counts)
 
         # Construct the url for the GET request
-        title = title.replace(" ", "-")
-        lowDate = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
-        highDate = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
+        title = str(title.replace(" ", "-"))
+        low_date = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
+        high_date = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
 
-        newLowDate = lowDate.strftime('%m/%d/%Y')
-        newHighDate = highDate.strftime('%m/%d/%Y')
+        new_low_date = low_date.strftime('%m/%d/%Y')
+        new_high_date = high_date.strftime('%m/%d/%Y')
 
-        urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr:1,cd_min:" + newLowDate  + ",cd_max:" + newHighDate
+        url_request = f"https://www.google.fr/search?q={title}&tbs=cdr:1,cd_min:{new_low_date},cd_max:{new_high_date}"
         print("URL constructed")
-        print("URL : {}".format(urlRequest))
+        print("URL : {}".format(url_request))
 
         print("Execute the request")
         # GET request
-        page = requests.get(urlRequest)
+        page = requests.get(url_request)
         soup = BeautifulSoup(page.content, "lxml")
-        for link in soup.find_all("a",href=re.compile("(?<=/url)(\?|\&)q=(htt.*://.*)")):
-            linkedURL = parse_qs(urlparse(link['href']).query)['q'][0]
+        for link in soup.find_all("a", href=re.compile("(?<=/url)([?&])q=(htt.*://.*)")):
+            linked_url = parse_qs(urlparse(link['href']).query)['q'][0]
 
-            if "webcache" not in linkedURL and parsed_uri.netloc not in linkedURL:
-                article = g.extract(url=linkedURL)
-                print("Name of the article: {}".format(article.title))
-                print("Pubication date: {}".format(article.publish_datetime_utc))
-                article.cleaned_text
-                print("URL of the article: {}".format(linkedURL))
+            if "webcache" not in linked_url and parsed_uri.netloc not in linked_url:
+                article = g.extract(url=linked_url)
+                print("Name of the article:", article.title)
+                print("Pubication date:", article.publish_datetime_utc)
+                print("Article content:\n", article.cleaned_text)
+                print("URL of the article:", linked_url)
                 print()
 
-        #TODO
+        # TODO
         self.content_score = random.randint(0, 100)
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
