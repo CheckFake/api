@@ -1,34 +1,26 @@
 import datetime
+import logging
 import random
+import re
 import statistics
+from collections import Counter
+from urllib.parse import urlparse, parse_qs
 
+import requests
 import tldextract
+from bs4 import BeautifulSoup
 from django.db import models
 from django.db.models import Avg
 from django.utils import timezone
-
-from api.utils import ChoiceEnum
-
-import urllib.request
-from urllib.request import urlopen, Request
-from urllib.parse import urlparse, parse_qs
-from bs4 import BeautifulSoup
-import requests
-import re
 from goose3 import Goose
-from collections import Counter
 from nltk.tokenize import RegexpTokenizer
 from nltk.stem.snowball import SnowballStemmer
+
+logger = logging.getLogger(__name__)
 
 
 class WebPage(models.Model):
     CURRENT_SCORES_VERSION = 3
-
-    class Categories(ChoiceEnum):
-        SCIENCE = 'science'
-        POLITICS = 'politics'
-        NEWS = 'news'
-        UNKNOWN = 'unknown'
 
     url = models.URLField(unique=True)
     content_score = models.PositiveIntegerField(blank=True, null=True)
@@ -39,7 +31,10 @@ class WebPage(models.Model):
 
     @property
     def site_score(self):
-        return (WebPage.objects.filter(base_domain=self.base_domain).aggregate(site_score=Avg('content_score')))['site_score']
+        return (WebPage.objects
+                .filter(base_domain=self.base_domain)
+                .aggregate(site_score=Avg('content_score'))
+                )['site_score']
 
     @property
     def global_score(self):
@@ -52,55 +47,61 @@ class WebPage(models.Model):
     def tokens(text):
         tokenizer = RegexpTokenizer(r'\w+')
         tokens = tokenizer.tokenize(text)
-        nonPunct = re.compile('.*[A-Za-z0-9].*')
-        filtered = [w for w in tokens if (nonPunct.match(w) and len(w) > 2)]
+        non_punct = re.compile('.*[A-Za-z0-9].*')
+        filtered = [w for w in tokens if (non_punct.match(w) and len(w) > 2)]
         stemmer = SnowballStemmer("french")
         for i in range(len(filtered)):
             filtered[i] = stemmer.stem(filtered[i])
         return filtered
 
     def compute_scores(self):
-        originalURL = self.url
-        parsed_uri = urlparse(originalURL)
+        original_url = self.url
+        parsed_uri = urlparse(original_url)
 
         # Extract the title and the text of the article
         g = Goose()
-        article = g.extract(url=originalURL)
+        article = g.extract(url=original_url)
         title = article.title
 
-        print("Write counter:")
+        logger.debug("Write counter:")
         print(Counter(tokens(article.cleaned_text)))
-        print("Counter written!!!")
+        logger.debug("Counter written!!!")
 
         # Make the url for the GET request
         title = title.replace(" ", "-")
         lowDate = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
         highDate = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
 
-        newLowDate = lowDate.strftime('%m/%d/%Y')
-        newHighDate = highDate.strftime('%m/%d/%Y')
+        # Construct the url for the GET request
+        title = str(title.replace(" ", "-"))
+        low_date = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
+        high_date = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
 
-        urlRequest = "https://www.google.fr/search?q=" + str(title) + "&tbs=cdr:1,cd_min:" + newLowDate  + ",cd_max:" + newHighDate
-        print("URL Get : {}".format(urlRequest))
+        new_low_date = low_date.strftime('%m/%d/%Y')
+        new_high_date = high_date.strftime('%m/%d/%Y')
 
-        print("Execute the request")
+        url_request = f"https://www.google.fr/search?q={title}&tbs=cdr:1,cd_min:{new_low_date},cd_max:{new_high_date}"
+        logger.debug("URL constructed")
+        logger.debug("URL : {}".format(url_request))
+
+        logger.debug("Execute the request")
         # GET request
-        page = requests.get(urlRequest)
+        page = requests.get(url_request)
         soup = BeautifulSoup(page.content, "lxml")
-        for link in soup.find_all("a",href=re.compile("(?<=/url)(\?|\&)q=(htt.*://.*)")):
-            linkedURL = parse_qs(urlparse(link['href']).query)['q'][0]
+        for link in soup.find_all("a", href=re.compile("(?<=/url)([?&])q=(htt.*://.*)")):
+            linked_url = parse_qs(urlparse(link['href']).query)['q'][0]
 
-            if "webcache" not in linkedURL and parsed_uri.netloc not in linkedURL:
-                article = g.extract(url=linkedURL)
-                print("Name of the article: {}".format(article.title))
-                print("Pubication date: {}".format(article.publish_datetime_utc))
-                article.cleaned_text
-                print("URL of the article: {}".format(linkedURL))
-                print()
+            if "webcache" not in linked_url and parsed_uri.netloc not in linked_url:
+                article = g.extract(url=linked_url)
+                logger.debug("Name of the article:", article.title)
+                logger.debug("Pubication date:", article.publish_datetime_utc)
+                logger.debug("Article content:\n", article.cleaned_text)
+                logger.debug("URL of the article:", linked_url)
+                logger.debug()
                 print(Counter(tokens(article.cleaned_text)))
                 print()
 
-        #TODO
+        # TODO
         self.content_score = random.randint(0, 100)
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
@@ -111,7 +112,7 @@ class WebPage(models.Model):
         )
         url_extraction = tld_extract(self.url)
         base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
-        print(base_domain)
+        logger.debug(f"Base domain found {base_domain}")
         self.base_domain = base_domain
 
         self.save()
