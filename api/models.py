@@ -98,6 +98,7 @@ class WebPage(models.Model):
         soup = BeautifulSoup(page.content, "lxml")
         for link in soup.find_all("a", href=re.compile("(?<=/url)([?&])q=(htt.*://.*)")):
             linked_url = parse_qs(urlparse(link['href']).query)['q'][0]
+            logger.debug('Found URL %s', linked_url)
 
             if "webcache" not in linked_url and parsed_uri.netloc not in linked_url:
                 logger.debug("Parsing article: %s", linked_url)
