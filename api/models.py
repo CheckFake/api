@@ -117,7 +117,11 @@ class WebPage(models.Model):
                 except ValueError:
                     logger.error("Found page that can't be processed : %s", linked_url)
 
-        logger.debug("Article score : {}".format(nb_interesting_articles / nb_articles))
+        if nb_articles == 0:
+            content_score = 0
+        else:
+            content_score = int(nb_interesting_articles / nb_articles * 1000) / 10
+        logger.debug("Article score : {}".format(content_score))
         logger.debug("Interesting articles : {}".format(dict_interesting_articles))
 
         InterestingRelatedArticle.objects.filter(web_page=self).delete()
@@ -125,7 +129,7 @@ class WebPage(models.Model):
             InterestingRelatedArticle.objects.create(title=title, url=url, web_page=self)
 
         # TODO
-        self.content_score = int(nb_interesting_articles / nb_articles * 1000) / 10
+        self.content_score = content_score
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
         self.save()
