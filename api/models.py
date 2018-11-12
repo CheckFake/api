@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class WebPage(models.Model):
-    CURRENT_SCORES_VERSION = 3
+    CURRENT_SCORES_VERSION = 8
 
     url = models.URLField(unique=True)
     content_score = models.PositiveIntegerField(blank=True, null=True)
@@ -31,17 +31,18 @@ class WebPage(models.Model):
 
     @property
     def site_score(self):
-        return (WebPage.objects
-                .filter(base_domain=self.base_domain)
-                .aggregate(site_score=Avg('content_score'))
-                )['site_score']
+        raw_site_score = (WebPage.objects
+                          .filter(base_domain=self.base_domain)
+                          .aggregate(site_score=Avg('content_score'))
+                          )['site_score']
+        return int(raw_site_score * 10) / 10
 
     @property
     def global_score(self):
         exclude = ['global_score', 'compute_scores']
         fields = list(filter(lambda x: "_score" in x and x not in exclude, dir(self)))
         scores = list(map(lambda x: getattr(self, x), fields))
-        return statistics.mean(scores)
+        return int(statistics.mean(scores) * 10) / 10
 
     @staticmethod
     def tokens(text):
@@ -70,11 +71,10 @@ class WebPage(models.Model):
         logger.debug("Tokens for article to review : %s", Counter(self.tokens(article.cleaned_text)))
         logger.debug("Text of the article to review : %s", article.cleaned_text)
 
-
         # Construct the url for the GET request
         title = str(title.replace(" ", "-"))
 
-        if article.publish_datetime_utc != None:
+        if article.publish_datetime_utc is not None:
             low_date = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
             high_date = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
 
@@ -117,28 +117,30 @@ class WebPage(models.Model):
         logger.debug("Article score : {}".format(nb_interesting_articles / nb_articles))
         logger.debug("Interesting articles : {}".format(dict_interesting_articles))
 
+        InterestingRelatedArticle.objects.filter(web_page=self).delete()
+        for url, title in dict_interesting_articles.items():
+            InterestingRelatedArticle.objects.create(title=title, url=url, web_page=self)
+
         # TODO
-        self.content_score = nb_interesting_articles / nb_articles;
+        self.content_score = int(nb_interesting_articles / nb_articles * 1000) / 10
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
-
-        tld_extract = tldextract.TLDExtract(
-            cache_file='api/external_data/public_suffixes_list.dat',
-            include_psl_private_domains=True
-        )
-        url_extraction = tld_extract(self.url)
-        base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
-        logger.debug(f"Base domain found {base_domain}")
-        self.base_domain = base_domain
-
         self.save()
         return self
 
     def to_dict(self):
         fields_to_serialize = ['url', 'global_score']
         self_serialized = {field: getattr(self, field) for field in fields_to_serialize}
+
         scores = ['content_score', 'site_score']
         self_serialized['scores'] = {field: getattr(self, field) for field in scores}
+
+        self_serialized['related_articles_selection'] = []
+        for article in self.interesting_related_articles.order_by('?')[:3]:
+            self_serialized['related_articles_selection'].append({
+                'title': article.title,
+                'url': article.url,
+            })
 
         return self_serialized
 
@@ -152,9 +154,25 @@ class WebPage(models.Model):
             return existing
 
         elif not existing:
-            existing = cls(url=url, scores_version=WebPage.CURRENT_SCORES_VERSION)
+            tld_extract = tldextract.TLDExtract(
+                cache_file='api/external_data/public_suffixes_list.dat',
+                include_psl_private_domains=True
+            )
+            url_extraction = tld_extract(url)
+            base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
+            logger.debug(f"Base domain found {base_domain}")
+            existing = cls.objects.create(
+                url=url,
+                scores_version=WebPage.CURRENT_SCORES_VERSION,
+                base_domain=base_domain)
 
         return existing.compute_scores()
 
     def __str__(self):
         return self.url
+
+
+class InterestingRelatedArticle(models.Model):
+    title = models.CharField(max_length=500)
+    url = models.URLField()
+    web_page = models.ForeignKey(WebPage, on_delete=models.CASCADE, related_name='interesting_related_articles')
