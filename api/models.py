@@ -1,6 +1,5 @@
 import datetime
 import logging
-import random
 import re
 import statistics
 from collections import Counter
@@ -13,8 +12,8 @@ from django.db import models
 from django.db.models import Avg
 from django.utils import timezone
 from goose3 import Goose
-from nltk.tokenize import RegexpTokenizer
 from nltk.stem.snowball import SnowballStemmer
+from nltk.tokenize import RegexpTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -136,10 +135,17 @@ class WebPage(models.Model):
         self_serialized['scores'] = {field: getattr(self, field) for field in scores}
 
         self_serialized['related_articles_selection'] = []
+        tld_extract = tldextract.TLDExtract(
+            cache_file='api/external_data/public_suffixes_list.dat',
+            include_psl_private_domains=True
+        )
         for article in self.interesting_related_articles.order_by('?')[:3]:
+            url_extraction = tld_extract(article.url)
+            base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
             self_serialized['related_articles_selection'].append({
                 'title': article.title,
                 'url': article.url,
+                'publisher': base_domain,
             })
 
         return self_serialized
