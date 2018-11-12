@@ -68,8 +68,8 @@ class WebPage(models.Model):
         logger.debug("Write counter:")
         article_counter = Counter(self.tokens(article.cleaned_text))
         logger.debug("Tokens for article to review : %s", Counter(self.tokens(article.cleaned_text)))
-        logger.debug("Counter written!!!")
-        logger.debug("Youpiiiiiiii!!")
+        logger.debug("Text of the article to review : %s", article.cleaned_text)
+
 
         # Construct the url for the GET request
         title = str(title.replace(" ", "-"))
@@ -89,6 +89,9 @@ class WebPage(models.Model):
             logger.debug("URL constructed without date")
             logger.debug("URL : {}".format(url_request))
 
+        nb_articles = 0
+        nb_interesting_articles = 0
+        dict_interesting_articles = {}
 
         logger.debug("Execute the request")
         # GET request
@@ -106,9 +109,16 @@ class WebPage(models.Model):
                 new_article_counter = Counter(self.tokens(article.cleaned_text))
                 shared_items = {k for k in article_counter if k in new_article_counter}
                 logger.debug("Length of same words : %s", len(shared_items))
+                if len(shared_items) > 20:
+                    nb_interesting_articles += 1
+                    dict_interesting_articles[linked_url] = article.title
+                nb_articles += 1
+
+        logger.debug("Article score : {}".format(nb_interesting_articles / nb_articles))
+        logger.debug("Interesting articles : {}".format(dict_interesting_articles))
 
         # TODO
-        self.content_score = random.randint(0, 100)
+        self.content_score = nb_interesting_articles / nb_articles;
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
 
