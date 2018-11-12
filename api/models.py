@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class WebPage(models.Model):
-    CURRENT_SCORES_VERSION = 8
+    CURRENT_SCORES_VERSION = 9
 
     url = models.URLField(unique=True)
     content_score = models.PositiveIntegerField(blank=True, null=True)
@@ -100,18 +100,21 @@ class WebPage(models.Model):
             linked_url = parse_qs(urlparse(link['href']).query)['q'][0]
 
             if "webcache" not in linked_url and parsed_uri.netloc not in linked_url:
-                article = g.extract(url=linked_url)
-                logger.debug("Name of the article: %s", article.title)
-                logger.debug("Pubication date: %s", article.publish_datetime_utc)
-                logger.debug("URL of the article: %s", linked_url)
-                logger.debug(Counter(self.tokens(article.cleaned_text)))
-                new_article_counter = Counter(self.tokens(article.cleaned_text))
-                shared_items = {k for k in article_counter if k in new_article_counter}
-                logger.debug("Length of same words : %s", len(shared_items))
-                if len(shared_items) > 20:
-                    nb_interesting_articles += 1
-                    dict_interesting_articles[linked_url] = article.title
-                nb_articles += 1
+                logger.debug("Parsing article: %s", linked_url)
+                try:
+                    article = g.extract(url=linked_url)
+                    logger.debug("Name of the article: %s", article.title)
+                    logger.debug("Pubication date: %s", article.publish_datetime_utc)
+                    logger.debug(Counter(self.tokens(article.cleaned_text)))
+                    new_article_counter = Counter(self.tokens(article.cleaned_text))
+                    shared_items = {k for k in article_counter if k in new_article_counter}
+                    logger.debug("Length of same words : %s", len(shared_items))
+                    if len(shared_items) > 20:
+                        nb_interesting_articles += 1
+                        dict_interesting_articles[linked_url] = article.title
+                    nb_articles += 1
+                except ValueError:
+                    logger.error("Found page that can't be processed : %s", linked_url)
 
         logger.debug("Article score : {}".format(nb_interesting_articles / nb_articles))
         logger.debug("Interesting articles : {}".format(dict_interesting_articles))
