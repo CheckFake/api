@@ -13,7 +13,7 @@ gunicorn = "*"
 tldextract = "*"
 "goose3" = "*"
 "beautifulsoup4" = "*"
-
+django-cors-middleware = "*"
 
 [dev-packages]
 
