@@ -70,23 +70,8 @@ class WebPage(models.Model):
         logger.debug("Tokens for article to review : %s", Counter(self.tokens(article.cleaned_text)))
         logger.debug("Text of the article to review : %s", article.cleaned_text)
 
-        # Construct the url for the GET request
-        title = str(title.replace(" ", "-"))
-
-        if article.publish_datetime_utc is not None:
-            low_date = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
-            high_date = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
-
-            new_low_date = low_date.strftime('%m/%d/%Y')
-            new_high_date = high_date.strftime('%m/%d/%Y')
-
-            url_request = f"https://www.google.fr/search?q={title}&tbs=cdr:1,cd_min:{new_low_date},cd_max:{new_high_date}"
-            logger.debug("URL constructed")
-            logger.debug("URL : {}".format(url_request))
-        else:
-            url_request = f"https://www.google.fr/search?q={title}"
-            logger.debug("URL constructed without date")
-            logger.debug("URL : {}".format(url_request))
+        title = title.replace(' ', '%20')
+        url_request = f"https://api.qwant.com/egp/search/web?q={title}&t=web&freshness=week"
 
         nb_articles = 0
         nb_interesting_articles = 0
@@ -94,16 +79,16 @@ class WebPage(models.Model):
 
         logger.debug("Execute the request")
         # GET request
-        page = requests.get(url_request)
-        soup = BeautifulSoup(page.content, "lxml")
-        for link in soup.find_all("a", href=re.compile("(?<=/url)([?&])q=(htt.*://.*)")):
-            linked_url = parse_qs(urlparse(link['href']).query)['q'][0]
-            logger.debug('Found URL %s', linked_url)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0',
+        }
 
-            if "webcache" not in linked_url and parsed_uri.netloc not in linked_url:
-                logger.debug("Parsing article: %s", linked_url)
+        page = requests.get(url_request, headers=headers)
+        page = page.json()
+        for result in page['data']['result']['items']:
+            if parsed_uri.netloc not in result['url']:
                 try:
-                    article = g.extract(url=linked_url)
+                    article = g.extract(url=result['url'])
                     logger.debug("Name of the article: %s", article.title)
                     logger.debug("Pubication date: %s", article.publish_datetime_utc)
                     logger.debug(Counter(self.tokens(article.cleaned_text)))
@@ -112,10 +97,10 @@ class WebPage(models.Model):
                     logger.debug("Length of same words : %s", len(shared_items))
                     if len(shared_items) > 20:
                         nb_interesting_articles += 1
-                        dict_interesting_articles[linked_url] = article.title
+                        dict_interesting_articles[result['url']] = article.title
                     nb_articles += 1
                 except ValueError:
-                    logger.error("Found page that can't be processed : %s", linked_url)
+                    logger.error("Found page that can't be processed : %s", result['url'])
 
         if nb_articles == 0:
             content_score = 0
