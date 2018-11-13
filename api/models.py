@@ -96,23 +96,26 @@ class WebPage(models.Model):
         # GET request
         page = requests.get(url_request)
         soup = BeautifulSoup(page.content, "lxml")
+
+        # Look for similar articles' url
         for link in soup.find_all("a", href=re.compile("(?<=/url)([?&])q=(htt.*://.*)")):
             linked_url = parse_qs(urlparse(link['href']).query)['q'][0]
             logger.debug('Found URL %s', linked_url)
 
+            # Extract other article content and comparison with the original's
             if "webcache" not in linked_url and parsed_uri.netloc not in linked_url:
                 logger.debug("Parsing article: %s", linked_url)
                 try:
-                    article = g.extract(url=linked_url)
-                    logger.debug("Name of the article: %s", article.title)
-                    logger.debug("Pubication date: %s", article.publish_datetime_utc)
-                    logger.debug(Counter(self.tokens(article.cleaned_text)))
-                    new_article_counter = Counter(self.tokens(article.cleaned_text))
+                    linked_article = g.extract(url=linked_url)
+                    logger.debug("Name of the article: %s", linked_article.title)
+                    logger.debug("Pubication date: %s", linked_article.publish_datetime_utc)
+                    logger.debug(Counter(self.tokens(linked_article.cleaned_text)))
+                    new_article_counter = Counter(self.tokens(linked_article.cleaned_text))
                     shared_items = {k for k in article_counter if k in new_article_counter}
                     logger.debug("Length of same words : %s", len(shared_items))
                     if len(shared_items) > 20:
                         nb_interesting_articles += 1
-                        dict_interesting_articles[linked_url] = article.title
+                        dict_interesting_articles[linked_url] = linked_article.title
                     nb_articles += 1
                 except ValueError:
                     logger.error("Found page that can't be processed : %s", linked_url)
