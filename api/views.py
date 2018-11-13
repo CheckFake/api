@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 def web_page_score_view(request):
-    web_page_url = request.GET.get('url').lower()
+    web_page_url = request.GET.get('url')
     logger.debug(f"Found url {web_page_url}")
     if not web_page_url:
         logger.error('No URL provided')
@@ -21,7 +21,7 @@ def web_page_score_view(request):
 
     return JsonResponse({
         'status': 'success',
-        'data': WebPage.from_url(url=web_page_url).to_dict()
+        'data': WebPage.from_url(url=web_page_url.lower()).to_dict()
     })
 
 
