@@ -1,5 +1,6 @@
 import datetime
 import logging
+import os
 import re
 import statistics
 from collections import Counter
@@ -71,39 +72,39 @@ class WebPage(models.Model):
         logger.debug("Text of the article to review : %s", article.cleaned_text)
 
         # Construct the url for the GET request
-        title = str(title.replace(" ", "-"))
+        base_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
+        params = {
+            "q": title,
+            "sortBy": "date",
+        }
 
         if article.publish_datetime_utc is not None:
-            low_date = ((article.publish_datetime_utc - datetime.timedelta(days=7)).date())
-            high_date = ((article.publish_datetime_utc + datetime.timedelta(days=7)).date())
+            params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=7)).timestamp()
+            logger.debug("Added since param")
 
-            new_low_date = low_date.strftime('%m/%d/%Y')
-            new_high_date = high_date.strftime('%m/%d/%Y')
+        response = requests.get(
+            url=base_url,
+            params=params,
+            headers={
+                "Ocp-Apim-Subscription-Key": os.getenv("BING_SEARCH_API_KEY"),
+            },
+        )
 
-            url_request = f"https://www.google.fr/search?q={title}&tbs=cdr:1,cd_min:{new_low_date},cd_max:{new_high_date}"
-            logger.debug("URL constructed")
-            logger.debug("URL : {}".format(url_request))
+        if response.status_code == 200:
+            data = response.json()
         else:
-            url_request = f"https://www.google.fr/search?q={title}"
-            logger.debug("URL constructed without date")
-            logger.debug("URL : {}".format(url_request))
+            data = {'value': []}
 
         nb_articles = 0
         nb_interesting_articles = 0
         dict_interesting_articles = {}
 
-        logger.debug("Execute the request")
-        # GET request
-        page = requests.get(url_request)
-        soup = BeautifulSoup(page.content, "lxml")
-
         # Look for similar articles' url
-        for link in soup.find_all("a", href=re.compile("(?<=/url)([?&])q=(htt.*://.*)")):
-            linked_url = parse_qs(urlparse(link['href']).query)['q'][0]
-            logger.debug('Found URL %s', linked_url)
+        for link in data['value']:
+            linked_url = link['url']
+            logger.debug("Found URL: %s", linked_url)
 
-            # Extract other article content and comparison with the original's
-            if "webcache" not in linked_url and parsed_uri.netloc not in linked_url:
+            if parsed_uri.netloc not in linked_url:
                 logger.debug("Parsing article: %s", linked_url)
                 try:
                     linked_article = g.extract(url=linked_url)
@@ -124,6 +125,7 @@ class WebPage(models.Model):
             content_score = 0
         else:
             content_score = int(nb_interesting_articles / nb_articles * 1000) / 10
+
         logger.debug("Article score : {}".format(content_score))
         logger.debug("Interesting articles : {}".format(dict_interesting_articles))
 
@@ -131,7 +133,6 @@ class WebPage(models.Model):
         for url, title in dict_interesting_articles.items():
             InterestingRelatedArticle.objects.create(title=title, url=url, web_page=self)
 
-        # TODO
         self.content_score = content_score
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
