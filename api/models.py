@@ -32,6 +32,7 @@ class WebPage(models.Model):
     def site_score(self):
         raw_site_score = (WebPage.objects
                           .filter(base_domain=self.base_domain)
+                          .filter(scores_version=WebPage.CURRENT_SCORES_VERSION)
                           .aggregate(site_score=Avg('content_score'))
                           )['site_score']
         return int(raw_site_score * 10) / 10
