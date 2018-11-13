@@ -4,11 +4,10 @@ import os
 import re
 import statistics
 from collections import Counter
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 
 import requests
 import tldextract
-from bs4 import BeautifulSoup
 from django.db import models
 from django.db.models import Avg
 from django.utils import timezone
