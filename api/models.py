@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class WebPage(models.Model):
-    CURRENT_SCORES_VERSION = 9
+    CURRENT_SCORES_VERSION = 10
 
     url = models.URLField(unique=True)
     content_score = models.PositiveIntegerField(blank=True, null=True)
