@@ -119,8 +119,9 @@ class WebPage(models.Model):
                         nb_interesting_articles += 1
                         dict_interesting_articles[linked_url] = linked_article.title
                     nb_articles += 1
-                except ValueError:
+                except (ValueError, LookupError) as e:
                     logger.error("Found page that can't be processed : %s", linked_url)
+                    logger.error("Error message : %s", e)
 
         if nb_articles == 0:
             content_score = 0
