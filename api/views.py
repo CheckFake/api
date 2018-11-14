@@ -21,7 +21,7 @@ def web_page_score_view(request):
 
     return JsonResponse({
         'status': 'success',
-        'data': WebPage.from_url(url=web_page_url.lower()).to_dict()
+        'data': WebPage.from_url(url=web_page_url).to_dict()
     })
 
 
