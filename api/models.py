@@ -185,7 +185,9 @@ class WebPage(models.Model):
             existing = cls.objects.create(
                 url=url,
                 scores_version=WebPage.CURRENT_SCORES_VERSION,
-                base_domain=base_domain)
+                base_domain=base_domain,
+                total_articles=0
+            )
 
         return existing.compute_scores()
 
