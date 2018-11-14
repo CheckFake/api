@@ -14,6 +14,7 @@ from django.utils import timezone
 from goose3 import Goose
 from nltk.stem.snowball import SnowballStemmer
 from nltk.tokenize import RegexpTokenizer
+from requests.exceptions import InvalidSchema
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,14 @@ class WebPage(models.Model):
 
         # Extract the title and the text of the article
         g = Goose({'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"})
-        article = g.extract(url=original_url)
+        try:
+            article = g.extract(url=original_url)
+        except InvalidSchema:
+            message = f'Invalid schema for url {self.url}'
+            logger.error(message)
+            self.delete()
+            return message
+
         title = article.title
 
         logger.debug("Write counter:")

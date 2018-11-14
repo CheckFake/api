@@ -19,10 +19,19 @@ def web_page_score_view(request):
             }
         }, status=400)
 
-    return JsonResponse({
-        'status': 'success',
-        'data': WebPage.from_url(url=web_page_url).to_dict()
-    })
+    web_page = WebPage.from_url(url=web_page_url)
+    if isinstance(web_page, str):
+        return JsonResponse({
+            'status': 'error',
+            'data': {
+                'message': web_page
+            }
+        })
+    else:
+        return JsonResponse({
+            'status': 'success',
+            'data': web_page.to_dict()
+        })
 
 
 def ping_view(request):
