@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class WebPage(models.Model):
     CURRENT_SCORES_VERSION = 10
 
-    url = models.URLField(unique=True)
+    url = models.URLField(unique=True, max_length=500)
     content_score = models.PositiveIntegerField(blank=True, null=True)
     base_domain = models.CharField(max_length=250)
     scores_version = models.PositiveIntegerField()
@@ -192,5 +192,5 @@ class WebPage(models.Model):
 
 class InterestingRelatedArticle(models.Model):
     title = models.CharField(max_length=500)
-    url = models.URLField()
+    url = models.URLField(max_length=500)
     web_page = models.ForeignKey(WebPage, on_delete=models.CASCADE, related_name='interesting_related_articles')
