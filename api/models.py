@@ -19,12 +19,13 @@ logger = logging.getLogger(__name__)
 
 
 class WebPage(models.Model):
-    CURRENT_SCORES_VERSION = 10
+    CURRENT_SCORES_VERSION = 11
 
     url = models.URLField(unique=True, max_length=500)
     content_score = models.PositiveIntegerField(blank=True, null=True)
     base_domain = models.CharField(max_length=250)
     scores_version = models.PositiveIntegerField()
+    total_articles = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -134,13 +135,14 @@ class WebPage(models.Model):
             InterestingRelatedArticle.objects.create(title=title, url=url, web_page=self)
 
         self.content_score = content_score
+        self.total_articles = nb_articles
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
         self.save()
         return self
 
     def to_dict(self):
-        fields_to_serialize = ['url', 'global_score']
+        fields_to_serialize = ['url', 'global_score', 'total_articles']
         self_serialized = {field: getattr(self, field) for field in fields_to_serialize}
 
         scores = ['content_score', 'site_score']
