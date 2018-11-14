@@ -63,7 +63,7 @@ class WebPage(models.Model):
         logger.debug("URL parsed")
 
         # Extract the title and the text of the article
-        g = Goose()
+        g = Goose({'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"})
         article = g.extract(url=original_url)
         title = article.title
 
