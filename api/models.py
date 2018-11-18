@@ -30,19 +30,25 @@ class WebPage(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def _site_score_queryset(self):
+        return (WebPage.objects
+                .filter(base_domain=self.base_domain)
+                .filter(scores_version=WebPage.CURRENT_SCORES_VERSION))
+
+    @property
+    def site_score_articles_count(self):
+        return self._site_score_queryset().count()
+
     @property
     def site_score(self):
-        raw_site_score = (WebPage.objects
-                          .filter(base_domain=self.base_domain)
-                          .filter(scores_version=WebPage.CURRENT_SCORES_VERSION)
+        raw_site_score = (self._site_score_queryset()
                           .aggregate(site_score=Avg('content_score'))
                           )['site_score']
         return int(raw_site_score * 10) / 10
 
     @property
     def global_score(self):
-        exclude = ['global_score', 'compute_scores']
-        fields = list(filter(lambda x: "_score" in x and x not in exclude, dir(self)))
+        fields = ['content_score', 'site_score']
         scores = list(map(lambda x: getattr(self, x), fields))
         return int(statistics.mean(scores) * 10) / 10
 
@@ -151,7 +157,7 @@ class WebPage(models.Model):
         return self
 
     def to_dict(self):
-        fields_to_serialize = ['url', 'global_score', 'total_articles']
+        fields_to_serialize = ['url', 'global_score', 'total_articles', 'site_score_articles_count']
         self_serialized = {field: getattr(self, field) for field in fields_to_serialize}
 
         scores = ['content_score', 'site_score']
