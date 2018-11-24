@@ -48,9 +48,9 @@ class WebPage(models.Model):
 
     @property
     def global_score(self):
-        fields = ['content_score', 'site_score']
-        scores = list(map(lambda x: getattr(self, x), fields))
-        return int(statistics.mean(scores) * 10) / 10
+        # allows to focus on the content if the site is "serious" and to focus on the site otherwise
+        final_score = (100-self.site_score]) / 100 * self.site_score + self.site_score * self.content_score / 100
+        return int(final_score * 10) / 10
 
     @staticmethod
     def tokens(text):
