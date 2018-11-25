@@ -2,7 +2,6 @@ import datetime
 import logging
 import os
 import re
-import statistics
 from collections import Counter
 from urllib.parse import urlparse
 
@@ -17,6 +16,30 @@ from nltk.tokenize import RegexpTokenizer
 from requests.exceptions import InvalidSchema
 
 logger = logging.getLogger(__name__)
+
+
+def get_related_articles(article):
+    title = article.title
+    # Construct the url for the GET request
+    base_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
+    params = {
+        "q": title,
+        "sortBy": "date",
+    }
+    if article.publish_datetime_utc is not None:
+        params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=7)).timestamp()
+        logger.debug("Added since param")
+    response = requests.get(
+        url=base_url,
+        params=params,
+        headers={
+            "Ocp-Apim-Subscription-Key": os.getenv("BING_SEARCH_API_KEY"),
+        },
+    )
+    if response.status_code == 200:
+        return response.json()
+
+    return {'value': []}
 
 
 class WebPage(models.Model):
@@ -65,57 +88,43 @@ class WebPage(models.Model):
 
     def compute_scores(self):
         logger.debug("Start compute_scores")
-        original_url = self.url
-        parsed_uri = urlparse(original_url)
-        logger.debug("URL parsed")
 
         # Extract the title and the text of the article
-        g = Goose({'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"})
+        g = Goose({
+            'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"
+        })
         try:
-            article = g.extract(url=original_url)
+            article = g.extract(url=self.url)
         except InvalidSchema:
             message = f'Invalid schema for url {self.url}'
             logger.error(message)
             self.delete()
             return message
 
-        title = article.title
-
         logger.debug("Write counter:")
         article_counter = Counter(self.tokens(article.cleaned_text))
-        logger.debug("Tokens for article to review : %s", Counter(self.tokens(article.cleaned_text)))
+        logger.debug("Tokens for article to review : %s", article_counter)
         logger.debug("Text of the article to review : %s", article.cleaned_text)
 
-        # Construct the url for the GET request
-        base_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
-        params = {
-            "q": title,
-            "sortBy": "date",
-        }
+        related_articles = get_related_articles(article)
 
-        if article.publish_datetime_utc is not None:
-            params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=7)).timestamp()
-            logger.debug("Added since param")
+        self._compute_content_score(article_counter, related_articles)
 
-        response = requests.get(
-            url=base_url,
-            params=params,
-            headers={
-                "Ocp-Apim-Subscription-Key": os.getenv("BING_SEARCH_API_KEY"),
-            },
-        )
+        self.scores_version = WebPage.CURRENT_SCORES_VERSION
+        self.save()
+        return self
 
-        if response.status_code == 200:
-            data = response.json()
-        else:
-            data = {'value': []}
-
+    def _compute_content_score(self, article_counter, related_articles):
         nb_articles = 0
         nb_interesting_articles = 0
         dict_interesting_articles = {}
-
+        parsed_uri = urlparse(self.url)
+        logger.debug("URL parsed")
+        g = Goose({
+            'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"
+        })
         # Look for similar articles' url
-        for link in data['value']:
+        for link in related_articles['value']:
             linked_url = link['url']
             logger.debug("Found URL: %s", linked_url)
 
@@ -136,25 +145,20 @@ class WebPage(models.Model):
                 except (ValueError, LookupError) as e:
                     logger.error("Found page that can't be processed : %s", linked_url)
                     logger.error("Error message : %s", e)
-
         if nb_articles == 0:
             content_score = 0
         else:
             content_score = int(nb_interesting_articles / nb_articles * 1000) / 10
-
         logger.debug("Article score : {}".format(content_score))
         logger.debug("Interesting articles : {}".format(dict_interesting_articles))
+        self.content_score = content_score
+        self.total_articles = nb_articles
+        self._store_interesting_related_articles(dict_interesting_articles)
 
+    def _store_interesting_related_articles(self, dict_interesting_articles):
         InterestingRelatedArticle.objects.filter(web_page=self).delete()
         for url, title in dict_interesting_articles.items():
             InterestingRelatedArticle.objects.create(title=title, url=url, web_page=self)
-
-        self.content_score = content_score
-        self.total_articles = nb_articles
-
-        self.scores_version = WebPage.CURRENT_SCORES_VERSION
-        self.save()
-        return self
 
     def to_dict(self):
         fields_to_serialize = ['url', 'global_score', 'total_articles', 'site_score_articles_count']
