@@ -49,7 +49,7 @@ class WebPage(models.Model):
     @property
     def global_score(self):
         # allows to focus on the content if the site is "serious" and to focus on the site otherwise
-        final_score = (100-self.site_score) / 100 * self.site_score + self.site_score * self.content_score / 100
+        final_score = (100 - self.site_score) / 100 * self.site_score + self.site_score * self.content_score / 100
         return int(final_score * 10) / 10
 
     @staticmethod
@@ -62,40 +62,6 @@ class WebPage(models.Model):
         for i in range(len(filtered)):
             filtered[i] = stemmer.stem(filtered[i])
         return filtered
-
-
-    def computeContentScore(self, g, data):
-
-        nb_articles = 0
-        nb_interesting_articles = 0
-        dict_interesting_articles = {}
-
-        for link in data['value']:
-            linked_url = link['url']
-            logger.debug("Found URL: %s", linked_url)
-
-            if parsed_uri.netloc not in linked_url:
-                logger.debug("Parsing article: %s", linked_url)
-                try:
-                    linked_article = g.extract(url=linked_url)
-                    logger.debug("Name of the article: %s", linked_article.title)
-                    logger.debug("Pubication date: %s", linked_article.publish_datetime_utc)
-                    logger.debug(Counter(self.tokens(linked_article.cleaned_text)))
-                    new_article_counter = Counter(self.tokens(linked_article.cleaned_text))
-                    shared_items = {k for k in article_counter if k in new_article_counter}
-                    logger.debug("Length of same words : %s", len(shared_items))
-                    if len(shared_items) > 20:
-                        nb_interesting_articles += 1
-                        dict_interesting_articles[linked_url] = linked_article.title
-                    nb_articles += 1
-                except (ValueError, LookupError) as e:
-                    logger.error("Found page that can't be processed : %s", linked_url)
-                    logger.error("Error message : %s", e)
-        if nb_articles == 0:
-            content_score = 0
-        else:
-            content_score = int(nb_interesting_articles / nb_articles * 1000) / 10
-        return content_score, dict_interesting_articles, nb_articles
 
     def compute_scores(self):
         logger.debug("Start compute_scores")
@@ -144,9 +110,37 @@ class WebPage(models.Model):
         else:
             data = {'value': []}
 
+        nb_articles = 0
+        nb_interesting_articles = 0
+        dict_interesting_articles = {}
+
         # Look for similar articles' url
-        # moved the code above compute_score in computeContentScore
-        self.content_score, dict_interesting_articles, self.total_articles = self.computeContentScore(g, data)
+        for link in data['value']:
+            linked_url = link['url']
+            logger.debug("Found URL: %s", linked_url)
+
+            if parsed_uri.netloc not in linked_url:
+                logger.debug("Parsing article: %s", linked_url)
+                try:
+                    linked_article = g.extract(url=linked_url)
+                    logger.debug("Name of the article: %s", linked_article.title)
+                    logger.debug("Pubication date: %s", linked_article.publish_datetime_utc)
+                    logger.debug(Counter(self.tokens(linked_article.cleaned_text)))
+                    new_article_counter = Counter(self.tokens(linked_article.cleaned_text))
+                    shared_items = {k for k in article_counter if k in new_article_counter}
+                    logger.debug("Length of same words : %s", len(shared_items))
+                    if len(shared_items) > 20:
+                        nb_interesting_articles += 1
+                        dict_interesting_articles[linked_url] = linked_article.title
+                    nb_articles += 1
+                except (ValueError, LookupError) as e:
+                    logger.error("Found page that can't be processed : %s", linked_url)
+                    logger.error("Error message : %s", e)
+
+        if nb_articles == 0:
+            content_score = 0
+        else:
+            content_score = int(nb_interesting_articles / nb_articles * 1000) / 10
 
         logger.debug("Article score : {}".format(content_score))
         logger.debug("Interesting articles : {}".format(dict_interesting_articles))
@@ -154,6 +148,9 @@ class WebPage(models.Model):
         InterestingRelatedArticle.objects.filter(web_page=self).delete()
         for url, title in dict_interesting_articles.items():
             InterestingRelatedArticle.objects.create(title=title, url=url, web_page=self)
+
+        self.content_score = content_score
+        self.total_articles = nb_articles
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
         self.save()
