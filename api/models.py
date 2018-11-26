@@ -1,3 +1,4 @@
+# coding: utf8
 import datetime
 import logging
 import os
@@ -5,6 +6,8 @@ import re
 import statistics
 from collections import Counter
 from urllib.parse import urlparse
+import nltk
+from unidecode import unidecode
 
 import requests
 import tldextract
@@ -15,6 +18,13 @@ from goose3 import Goose
 from nltk.stem.snowball import SnowballStemmer
 from nltk.tokenize import RegexpTokenizer
 from requests.exceptions import InvalidSchema
+from stop_words import get_stop_words
+from textblob import TextBlob
+from textblob_fr import PatternTagger, PatternAnalyzer
+import pickle
+import spacy
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -54,14 +64,30 @@ class WebPage(models.Model):
 
     @staticmethod
     def tokens(text):
-        tokenizer = RegexpTokenizer(r'\w+')
-        tokens = tokenizer.tokenize(text)
-        non_punct = re.compile('.*[A-Za-z0-9].*')
-        filtered = [w for w in tokens if (non_punct.match(w) and len(w) > 2)]
+        #tokenizer = RegexpTokenizer(r'\w+')
+        #tokens = tokenizer.tokenize(text)
+        #non_punct = re.compile('.*[A-Za-z0-9].*')
+        #filtered = [w for w in tokens if (non_punct.match(w))] #and len(w) > 2)]
+        root_words = []
         stemmer = SnowballStemmer("french")
-        for i in range(len(filtered)):
-            filtered[i] = stemmer.stem(filtered[i])
-        return filtered
+        for i in range(len(text)):
+            root_words.append(stemmer.stem(text[i]))
+        return root_words
+
+    @staticmethod
+    def nouns(text):
+        nouns = []
+        #stop = get_stop_words('french')
+        #list_nouns = ['NN', 'NNS', 'NNP', 'NNPS']
+        articleWithoutSpecialCaracters = unidecode(text)
+        document = re.sub('[^A-Za-z .\-]+', ' ', articleWithoutSpecialCaracters)
+        document = ' '.join(document.split())
+        logger.debug("Text cleaned : %r", document)
+        nlp = spacy.load('fr')
+        doc = nlp(document)
+        logger.debug("Words in the document : %s", [(w.text, w.pos_) for w in doc])
+        nouns += [w.text for w in doc if ((w.pos_ == "NOUN" or w.pos_ == "PROPN") and len(w.text) > 1)]
+        return nouns
 
     def compute_scores(self):
         logger.debug("Start compute_scores")
@@ -81,10 +107,12 @@ class WebPage(models.Model):
 
         title = article.title
 
-        logger.debug("Write counter:")
-        article_counter = Counter(self.tokens(article.cleaned_text))
-        logger.debug("Tokens for article to review : %s", Counter(self.tokens(article.cleaned_text)))
         logger.debug("Text of the article to review : %s", article.cleaned_text)
+        article_counter = Counter(self.tokens(article.cleaned_text))
+
+        nouns_article = self.nouns(article.cleaned_text)
+        counter_nouns_articles = Counter(self.tokens(nouns_article))
+
 
         # Construct the url for the GET request
         base_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
@@ -125,10 +153,13 @@ class WebPage(models.Model):
                     linked_article = g.extract(url=linked_url)
                     logger.debug("Name of the article: %s", linked_article.title)
                     logger.debug("Pubication date: %s", linked_article.publish_datetime_utc)
-                    logger.debug(Counter(self.tokens(linked_article.cleaned_text)))
-                    new_article_counter = Counter(self.tokens(linked_article.cleaned_text))
-                    shared_items = {k for k in article_counter if k in new_article_counter}
-                    logger.debug("Length of same words : %s", len(shared_items))
+                    new_nouns_article = self.nouns(linked_article.cleaned_text)
+                    new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
+                    shared_items = {k for k in counter_nouns_articles if k in new_counter_nouns_articles and new_counter_nouns_articles[k] > 1}
+                    #logger.debug(Counter(self.tokens(linked_article.cleaned_text)))
+                    #new_article_counter = Counter(self.tokens(linked_article.cleaned_text))
+                    #shared_items = {k for k in article_counter if k in new_article_counter}
+                    #logger.debug("Length of same words : %s", len(shared_items))
                     if len(shared_items) > 20:
                         nb_interesting_articles += 1
                         dict_interesting_articles[linked_url] = linked_article.title
