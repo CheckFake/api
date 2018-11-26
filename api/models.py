@@ -64,10 +64,6 @@ class WebPage(models.Model):
 
     @staticmethod
     def tokens(text):
-        #tokenizer = RegexpTokenizer(r'\w+')
-        #tokens = tokenizer.tokenize(text)
-        #non_punct = re.compile('.*[A-Za-z0-9].*')
-        #filtered = [w for w in tokens if (non_punct.match(w))] #and len(w) > 2)]
         root_words = []
         stemmer = SnowballStemmer("french")
         for i in range(len(text)):
