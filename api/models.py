@@ -120,11 +120,25 @@ class WebPage(models.Model):
 
         #article_counter = Counter(self.tokens(article.cleaned_text))
 
+        logger.debug("Text of the article : %s", article.cleaned_text)
+        if article.cleaned_text == "":
+            message = f'Ooooups, nous n\'avons pas pu extraire le texte de l\'article'
+            logger.error(message)
+            self.delete()
+            return message
+
         nouns_article = self.nouns(article.cleaned_text)
         counter_nouns_article = Counter(self.tokens(nouns_article))
         logger.debug("Nouns in the article : %s", counter_nouns_article)
 
         related_articles = get_related_articles(article)
+
+        if related_articles["value"] == []:
+            message = f'Cet article semble isolé, nous n\'avons trouvé aucun article en lien avec lui. Faites attention!'
+            logger.error(message)
+            self.delete()
+            return message
+
         logger.debug("Articles found %s", related_articles)
 
         self._compute_content_score(counter_nouns_article, related_articles)
@@ -135,6 +149,7 @@ class WebPage(models.Model):
 
     def _compute_content_score(self, counter_nouns_article, related_articles):
         nb_articles = 0
+        scores_new_articles = []
         nb_interesting_articles = 0
         dict_interesting_articles = {}
         parsed_uri = urlparse(self.url)
@@ -143,12 +158,15 @@ class WebPage(models.Model):
             'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"
         })
 
-        counter_total_weight_nouns = 0
+        counter_article = 0
+        #for word in counter_nouns_article:
+        #    if counter_nouns_article[word] > 1:
+        #        counter_total_weight_nouns += counter_nouns_article[word]
         for word in counter_nouns_article:
             if counter_nouns_article[word] > 1:
-                counter_total_weight_nouns += counter_nouns_article[word]
+                counter_article += 1
         counter_new_weight_nouns = 0
-        logger.debug("Weight nouns article : %s", counter_total_weight_nouns)
+        logger.debug("Weight nouns article : %s", counter_article)
         # Look for similar articles' url
         for link in related_articles['value']:
             linked_url = link['url']
@@ -160,7 +178,7 @@ class WebPage(models.Model):
                     logger.debug("Name of the article: %s", linked_article.title)
                     new_nouns_article = self.nouns(linked_article.cleaned_text)
                     new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
-                    shared_items = [(k, counter_nouns_article[k]) for k in counter_nouns_article if k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
+                    shared_items = [k for k in counter_nouns_article if k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
                     #if len(shared_items) > 20:
                     #    logger.debug("Shared nouns : %s", shared_items)
                     #    nb_interesting_articles += 1
@@ -168,19 +186,21 @@ class WebPage(models.Model):
                     #else:
                     #    logger.debug("Shared nouns but not enough: %s", shared_items)
                     #nb_articles += 1
-                    for word, counter in shared_items:
-                        counter_new_weight_nouns += counter
-                    logger.debug("Value of the counter : %s", counter_new_weight_nouns)
+                    scores_new_articles.append(len(shared_items) / counter_article)
+                    logger.debug("Percentage for new articles : %s", scores_new_articles)
                     nb_articles += 1
                     dict_interesting_articles[linked_url] = linked_article.title
                 except (ValueError, LookupError) as e:
                     logger.error("Found page that can't be processed : %s", linked_url)
                     logger.error("Error message : %s", e)
-        #TODO: pas de résultat --> résultat null
+        #TODO: PB 1 article mais du même éditeur
         if nb_articles == 0:
             content_score = 0
         else:
-            content_score = int(counter_new_weight_nouns / (counter_total_weight_nouns * nb_articles) * 1000) / 10
+            sum_scores = 0
+            for i in range(0, len(scores_new_articles)):
+                sum_scores += scores_new_articles[i]
+            content_score = int(sum_scores / len(scores_new_articles) * 1000) / 10
         logger.debug("Article score : {}".format(content_score))
         #logger.debug("Interesting articles : {}".format(dict_interesting_articles))
         self.content_score = content_score
