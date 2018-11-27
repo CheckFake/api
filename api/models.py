@@ -103,6 +103,8 @@ class WebPage(models.Model):
         document = re.sub('[^A-Za-z .\-]+', ' ', articleWithoutSpecialCaracters)
         document = ' '.join(document.split())
         nlp = spacy.load('fr')
+        nlp.remove_pipe('parser')
+        nlp.remove_pipe('ner')
         doc = nlp(document)
         #logger.debug("Words in the document : %s", [(w.text, w.pos_) for w in doc])
         nouns += [w.text for w in doc if ((w.pos_ == "NOUN" or w.pos_ == "PROPN") and len(w.text) > 1)]
