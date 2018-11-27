@@ -50,7 +50,7 @@ def get_related_articles(article):
 
 
 class WebPage(models.Model):
-    CURRENT_SCORES_VERSION = 11
+    CURRENT_SCORES_VERSION = 12
 
     url = models.URLField(unique=True, max_length=500)
     content_score = models.PositiveIntegerField(blank=True, null=True)
