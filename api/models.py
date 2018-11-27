@@ -70,6 +70,10 @@ class WebPage(models.Model):
         return self._site_score_queryset().count()
 
     @property
+    def interesting_related_articles_count(self):
+        return self.interesting_related_articles.count()
+
+    @property
     def site_score(self):
         raw_site_score = (self._site_score_queryset()
                           .aggregate(site_score=Avg('content_score'))
@@ -218,7 +222,10 @@ class WebPage(models.Model):
             InterestingRelatedArticle.objects.create(title=title, url=url, web_page=self)
 
     def to_dict(self):
-        fields_to_serialize = ['url', 'global_score', 'total_articles', 'site_score_articles_count']
+        fields_to_serialize = [
+            'url', 'global_score', 'total_articles',
+            'site_score_articles_count', 'interesting_related_articles_count'
+        ]
         self_serialized = {field: getattr(self, field) for field in fields_to_serialize}
 
         scores = ['content_score', 'site_score']
