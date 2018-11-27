@@ -150,7 +150,6 @@ class WebPage(models.Model):
     def _compute_content_score(self, counter_nouns_article, related_articles):
         nb_articles = 0
         scores_new_articles = []
-        nb_interesting_articles = 0
         dict_interesting_articles = {}
         parsed_uri = urlparse(self.url)
         logger.debug("URL parsed")
@@ -159,13 +158,9 @@ class WebPage(models.Model):
         })
 
         counter_article = 0
-        #for word in counter_nouns_article:
-        #    if counter_nouns_article[word] > 1:
-        #        counter_total_weight_nouns += counter_nouns_article[word]
         for word in counter_nouns_article:
             if counter_nouns_article[word] > 1:
                 counter_article += 1
-        counter_new_weight_nouns = 0
         logger.debug("Weight nouns article : %s", counter_article)
         # Look for similar articles' url
         for link in related_articles['value']:
@@ -177,30 +172,34 @@ class WebPage(models.Model):
                     linked_article = g.extract(url=linked_url)
                     logger.debug("Name of the article: %s", linked_article.title)
                     new_nouns_article = self.nouns(linked_article.cleaned_text)
-                    new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
-                    shared_items = [k for k in counter_nouns_article if k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
-                    #if len(shared_items) > 20:
-                    #    logger.debug("Shared nouns : %s", shared_items)
-                    #    nb_interesting_articles += 1
-                    #    dict_interesting_articles[linked_url] = linked_article.title
-                    #else:
-                    #    logger.debug("Shared nouns but not enough: %s", shared_items)
-                    #nb_articles += 1
-                    scores_new_articles.append(len(shared_items) / counter_article)
-                    logger.debug("Percentage for new articles : %s", scores_new_articles)
-                    nb_articles += 1
-                    dict_interesting_articles[linked_url] = linked_article.title
+                    if len(linked_article.cleaned_text) > 20:
+                        new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
+                        shared_items = [k for k in counter_nouns_article if k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
+                        score_article = len(shared_items) / counter_article
+                        if score_article > 0.4:
+                            scores_new_articles.append(score_article)
+                        else:
+                            logger.debug("Too low score : %s", score_article)
+                        logger.debug("Percentage for new articles : %s", scores_new_articles)
+                        dict_interesting_articles[linked_url] = linked_article.title
+                    else:
+                        logger.debug("Invalid article : %s", linked_article.cleaned_text)
                 except (ValueError, LookupError) as e:
                     logger.error("Found page that can't be processed : %s", linked_url)
                     logger.error("Error message : %s", e)
-        #TODO: PB 1 article mais du même éditeur
-        if nb_articles == 0:
+        if len(scores_new_articles) == 0:
             content_score = 0
-        else:
-            sum_scores = 0
-            for i in range(0, len(scores_new_articles)):
-                sum_scores += scores_new_articles[i]
-            content_score = int(sum_scores / len(scores_new_articles) * 1000) / 10
+        elif len(scores_new_articles) == 1:
+            content_score = 10
+        elif len(scores_new_articles) == 2:
+            content_score = 30
+        elif len(scores_new_articles) == 3:
+            content_score = 50
+        elif len(scores_new_articles) == 4 or len(scores_new_articles) == 5:
+            content_score = 70
+        elif len(scores_new_articles) >= 6:
+            content_score = 85
+        #    content_score = int(sum_scores / len(scores_new_articles) * 1000) / 10
         logger.debug("Article score : {}".format(content_score))
         #logger.debug("Interesting articles : {}".format(dict_interesting_articles))
         self.content_score = content_score
