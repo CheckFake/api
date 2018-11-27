@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 
 def get_related_articles(article):
     title = article.title
+    logger.debug("Title of the article : %s", title)
     # Construct the url for the GET request
     base_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
     params = {
@@ -122,7 +123,7 @@ class WebPage(models.Model):
 
         logger.debug("Text of the article : %s", article.cleaned_text)
         if article.cleaned_text == "":
-            message = f'Ooooups, nous n\'avons pas pu extraire le texte de l\'article'
+            message = f'Oups, nous n\'avons pas pu extraire le texte de l\'article'
             logger.error(message)
             self.delete()
             return message
@@ -149,6 +150,7 @@ class WebPage(models.Model):
 
     def _compute_content_score(self, counter_nouns_article, related_articles):
         nb_articles = 0
+        interesting_articles = 0
         scores_new_articles = []
         dict_interesting_articles = {}
         parsed_uri = urlparse(self.url)
@@ -172,34 +174,38 @@ class WebPage(models.Model):
                     linked_article = g.extract(url=linked_url)
                     logger.debug("Name of the article: %s", linked_article.title)
                     new_nouns_article = self.nouns(linked_article.cleaned_text)
-                    if len(linked_article.cleaned_text) > 20:
-                        new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
-                        shared_items = [k for k in counter_nouns_article if k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
-                        score_article = len(shared_items) / counter_article
-                        if score_article > 0.4:
-                            scores_new_articles.append(score_article)
-                        else:
-                            logger.debug("Too low score : %s", score_article)
-                        logger.debug("Percentage for new articles : %s", scores_new_articles)
+                    new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
+                    shared_items = [k for k in counter_nouns_article if k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
+                    score_article = len(shared_items) / counter_article
+                    if score_article > 0.4:
+                        scores_new_articles.append(score_article)
+                        interesting_articles += 1
                         dict_interesting_articles[linked_url] = linked_article.title
                     else:
-                        logger.debug("Invalid article : %s", linked_article.cleaned_text)
+                        logger.debug("Too low score : %s", score_article)
+                    nb_articles += 1
+                    logger.debug("Percentage for new articles : %s", scores_new_articles)
                 except (ValueError, LookupError) as e:
                     logger.error("Found page that can't be processed : %s", linked_url)
                     logger.error("Error message : %s", e)
-        if len(scores_new_articles) == 0:
-            content_score = 0
-        elif len(scores_new_articles) == 1:
-            content_score = 10
-        elif len(scores_new_articles) == 2:
-            content_score = 30
-        elif len(scores_new_articles) == 3:
-            content_score = 50
-        elif len(scores_new_articles) == 4 or len(scores_new_articles) == 5:
-            content_score = 70
-        elif len(scores_new_articles) >= 6:
-            content_score = 85
-        #    content_score = int(sum_scores / len(scores_new_articles) * 1000) / 10
+        if len(related_articles['value']) <= 4:
+            if nb_articles == 0:
+                content_score = 0
+            else:
+                content_score = (interesting_articles / nb_articles * 1000) / 10
+        else:
+            if len(scores_new_articles) == 0:
+                content_score = 0
+            elif len(scores_new_articles) == 1:
+                content_score = 10
+            elif len(scores_new_articles) == 2:
+                content_score = 30
+            elif len(scores_new_articles) == 3:
+                content_score = 50
+            elif len(scores_new_articles) == 4 or len(scores_new_articles) == 5:
+                content_score = 70
+            else:
+                content_score = 85
         logger.debug("Article score : {}".format(content_score))
         #logger.debug("Interesting articles : {}".format(dict_interesting_articles))
         self.content_score = content_score
