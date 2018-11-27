@@ -11,7 +11,7 @@ VOLUME /app/staticfiles
 
 RUN pip3 install pipenv
 COPY Pipfile Pipfile.lock ./
-RUN pipenv install && apk del .build-deps
+RUN pipenv install && apk del .build-deps && pipenv run python -m spacy download fr
 
 COPY . ./
 
