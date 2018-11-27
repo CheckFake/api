@@ -5,21 +5,17 @@ import os
 import re
 from collections import Counter
 from urllib.parse import urlparse
-from unidecode import unidecode
 
 import requests
+import spacy
 import tldextract
 from django.db import models
 from django.db.models import Avg
 from django.utils import timezone
 from goose3 import Goose
 from nltk.stem.snowball import SnowballStemmer
-from nltk.tokenize import RegexpTokenizer
 from requests.exceptions import InvalidSchema
-from stop_words import get_stop_words
-import spacy
-
-
+from unidecode import unidecode
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +46,7 @@ def get_related_articles(article):
 
 
 class WebPage(models.Model):
-    CURRENT_SCORES_VERSION = 11
+    CURRENT_SCORES_VERSION = 12
 
     url = models.URLField(unique=True, max_length=500)
     content_score = models.PositiveIntegerField(blank=True, null=True)
@@ -97,8 +93,8 @@ class WebPage(models.Model):
     @staticmethod
     def nouns(text):
         nouns = []
-        #stop = get_stop_words('french')
-        #list_nouns = ['NN', 'NNS', 'NNP', 'NNPS']
+        # stop = get_stop_words('french')
+        # list_nouns = ['NN', 'NNS', 'NNP', 'NNPS']
         articleWithoutSpecialCaracters = unidecode(text)
         document = re.sub('[^A-Za-z .\-]+', ' ', articleWithoutSpecialCaracters)
         document = ' '.join(document.split())
@@ -106,7 +102,7 @@ class WebPage(models.Model):
         nlp.remove_pipe('parser')
         nlp.remove_pipe('ner')
         doc = nlp(document)
-        #logger.debug("Words in the document : %s", [(w.text, w.pos_) for w in doc])
+        # logger.debug("Words in the document : %s", [(w.text, w.pos_) for w in doc])
         nouns += [w.text for w in doc if ((w.pos_ == "NOUN" or w.pos_ == "PROPN") and len(w.text) > 1)]
         return nouns
 
@@ -125,7 +121,7 @@ class WebPage(models.Model):
             self.delete()
             return message
 
-        #article_counter = Counter(self.tokens(article.cleaned_text))
+        # article_counter = Counter(self.tokens(article.cleaned_text))
 
         logger.debug("Text of the article : %s", article.cleaned_text)
         if article.cleaned_text == "":
@@ -181,7 +177,8 @@ class WebPage(models.Model):
                     logger.debug("Name of the article: %s", linked_article.title)
                     new_nouns_article = self.nouns(linked_article.cleaned_text)
                     new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
-                    shared_items = [k for k in counter_nouns_article if k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
+                    shared_items = [k for k in counter_nouns_article if
+                                    k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
                     score_article = len(shared_items) / counter_article
                     if score_article > 0.4:
                         scores_new_articles.append(score_article)
@@ -213,7 +210,7 @@ class WebPage(models.Model):
             else:
                 content_score = 85
         logger.debug("Article score : {}".format(content_score))
-        #logger.debug("Interesting articles : {}".format(dict_interesting_articles))
+        # logger.debug("Interesting articles : {}".format(dict_interesting_articles))
         self.content_score = content_score
         self.total_articles = nb_articles
         self._store_interesting_related_articles(dict_interesting_articles)

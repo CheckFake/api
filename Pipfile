@@ -15,11 +15,7 @@ tldextract = "*"
 "beautifulsoup4" = "*"
 django-cors-middleware = "*"
 nltk = "*"
-stop-words = "*"
-textblob = "*"
-textblob-fr = "*"
 unidecode = "*"
-unicode-nazi = "*"
 spacy = "*"
 
 [dev-packages]
