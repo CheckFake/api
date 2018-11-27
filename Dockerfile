@@ -1,7 +1,7 @@
 FROM python:3.6-alpine
 
 RUN apk add --no-cache postgresql-libs git libffi-dev libxml2-dev libxslt-dev jpeg-dev && \
-    apk add --no-cache --virtual .build-deps gcc musl-dev postgresql-dev tzdata && \
+    apk add --no-cache --virtual .build-deps gcc g++ musl-dev postgresql-dev tzdata && \
     cp /usr/share/zoneinfo/Europe/Paris /etc/localtime && \
     echo "Europe/Paris" >  /etc/timezone
 
