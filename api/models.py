@@ -93,16 +93,13 @@ class WebPage(models.Model):
     @staticmethod
     def nouns(text):
         nouns = []
-        # stop = get_stop_words('french')
-        # list_nouns = ['NN', 'NNS', 'NNP', 'NNPS']
-        articleWithoutSpecialCaracters = unidecode(text)
-        document = re.sub('[^A-Za-z .\-]+', ' ', articleWithoutSpecialCaracters)
+        article_without_special_caracters = unidecode(text)
+        document = re.sub('[^A-Za-z .\-]+', ' ', article_without_special_caracters)
         document = ' '.join(document.split())
         nlp = spacy.load('fr')
         nlp.remove_pipe('parser')
         nlp.remove_pipe('ner')
         doc = nlp(document)
-        # logger.debug("Words in the document : %s", [(w.text, w.pos_) for w in doc])
         nouns += [w.text for w in doc if ((w.pos_ == "NOUN" or w.pos_ == "PROPN") and len(w.text) > 1)]
         return nouns
 
@@ -116,19 +113,15 @@ class WebPage(models.Model):
         try:
             article = g.extract(url=self.url)
         except InvalidSchema:
-            message = f'Invalid schema for url {self.url}'
-            logger.error(message)
             self.delete()
-            return message
+            return f"Schéma invalide"
 
         # article_counter = Counter(self.tokens(article.cleaned_text))
 
         logger.debug("Text of the article : %s", article.cleaned_text)
         if article.cleaned_text == "":
-            message = f'Oups, nous n\'avons pas pu extraire le texte de l\'article'
-            logger.error(message)
             self.delete()
-            return message
+            return "Oups, nous n'avons pas pu extraire le texte de l'article"
 
         nouns_article = self.nouns(article.cleaned_text)
         counter_nouns_article = Counter(self.tokens(nouns_article))
@@ -136,11 +129,9 @@ class WebPage(models.Model):
 
         related_articles = get_related_articles(article)
 
-        if related_articles["value"] == []:
-            message = f'Cet article semble isolé, nous n\'avons trouvé aucun article en lien avec lui. Faites attention!'
-            logger.error(message)
+        if not related_articles["value"]:
             self.delete()
-            return message
+            return "Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. Faites attention!"
 
         logger.debug("Articles found %s", related_articles)
 
@@ -248,6 +239,9 @@ class WebPage(models.Model):
     @classmethod
     def from_url(cls, url):
         existing = cls.objects.filter(url=url).first()
+
+        if existing and existing.content_score is None:
+            return 'Cet article est en cours de traitement. Merci de réessayer dans quelques minutes.'
 
         if (existing
                 and existing.scores_version == WebPage.CURRENT_SCORES_VERSION
