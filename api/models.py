@@ -185,7 +185,7 @@ class WebPage(models.Model):
         if nb_articles == 0:
             content_score = 0
         elif nb_articles <= 8:
-            content_score = (interesting_articles / nb_articles * 1000) / 10
+            content_score = int(interesting_articles / nb_articles * 1000) / 10
         else:
             if len(scores_new_articles) == 0:
                 content_score = 0
