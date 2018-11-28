@@ -191,11 +191,10 @@ class WebPage(models.Model):
                 except (ValueError, LookupError) as e:
                     logger.error("Found page that can't be processed : %s", linked_url)
                     logger.error("Error message : %s", e)
-        if len(related_articles['value']) <= 4:
-            if nb_articles == 0:
-                content_score = 0
-            else:
-                content_score = (interesting_articles / nb_articles * 1000) / 10
+        if nb_articles == 0:
+            content_score = 0
+        elif nb_articles <= 8:
+            content_score = (interesting_articles / nb_articles * 1000) / 10
         else:
             if len(scores_new_articles) == 0:
                 content_score = 0
