@@ -139,6 +139,7 @@ class WebPage(models.Model):
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
         self.save()
+        logger.info(f"Finished computing scores for article {self.url}")
         return self
 
     def _compute_content_score(self, counter_nouns_article, related_articles):
