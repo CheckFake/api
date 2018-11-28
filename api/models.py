@@ -247,6 +247,7 @@ class WebPage(models.Model):
         if (existing
                 and existing.scores_version == WebPage.CURRENT_SCORES_VERSION
                 and existing.updated_at > timezone.now() - datetime.timedelta(days=7)):
+            logger.info(f"Returning existing object for url {url}")
             return existing
 
         elif not existing:
