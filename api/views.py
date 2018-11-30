@@ -19,8 +19,10 @@ def web_page_score_view(request):
             }
         }, status=400)
 
+    logger.info(f"Received request for following URL : {web_page_url}")
     web_page = WebPage.from_url(url=web_page_url)
     if isinstance(web_page, str):
+        logger.error(f'{web_page} - {web_page_url}', extra={'request': request})
         return JsonResponse({
             'status': 'error',
             'data': {

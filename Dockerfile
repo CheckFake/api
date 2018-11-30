@@ -18,7 +18,7 @@ COPY . ./
 
 CMD ["sh", "bash/run-prod.sh"]
 
-HEALTHCHECK --interval=10s --timeout=10s CMD ["pipenv", "run", "python", "healthcheck.py"]
+HEALTHCHECK --interval=60s --timeout=20s --start-period=180s CMD ["pipenv", "run", "python", "healthcheck.py"]
 
 ENV DATABASE_URL postgres://postgresql:postgresql@db:5432/fake_news_detector
 ENV SECRET_KEY ''

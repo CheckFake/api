@@ -109,8 +109,6 @@ class WebPage(models.Model):
         print("nouns1")
         nouns = []
         print("nouns2")
-        # stop = get_stop_words('french')
-        # list_nouns = ['NN', 'NNS', 'NNP', 'NNPS']
         articleWithoutSpecialCaracters = unidecode(text)
         print("nouns3")
         document = re.sub('[^A-Za-z .\-]+', ' ', articleWithoutSpecialCaracters)
@@ -123,8 +121,6 @@ class WebPage(models.Model):
         nlp.remove_pipe('ner')
         print("nouns8")
         doc = nlp(document)
-        print("nouns9")
-        # logger.debug("Words in the document : %s", [(w.text, w.pos_) for w in doc])
         nouns += [w.text for w in doc if ((w.pos_ == "NOUN" or w.pos_ == "PROPN") and len(w.text) > 1)]
         print("nouns10")
         return nouns
@@ -141,22 +137,16 @@ class WebPage(models.Model):
         try:
             article = g.extract(url=self.url)
         except InvalidSchema:
-            message = f'Invalid schema for url {self.url}'
-            logger.error(message)
             self.delete()
-            return message
-        print("scores3")
+            return f"Schéma invalide"
 
         # article_counter = Counter(self.tokens(article.cleaned_text))
 
         logger.debug("Text of the article : %s", article.cleaned_text)
         print("scores4")
         if article.cleaned_text == "":
-            message = f'Oups, nous n\'avons pas pu extraire le texte de l\'article'
-            logger.error(message)
             self.delete()
-            return message
-        print("scores5")
+            return "Oups, nous n'avons pas pu extraire le texte de l'article"
 
         nlp = spacy.load('fr')
         nouns_article = self.nouns(article.cleaned_text, nlp)
@@ -169,11 +159,9 @@ class WebPage(models.Model):
         related_articles = get_related_articles(article)
         print("scores9")
 
-        if related_articles["value"] == []:
-            message = f'Cet article semble isolé, nous n\'avons trouvé aucun article en lien avec lui. Faites attention!'
-            logger.error(message)
+        if not related_articles["value"]:
             self.delete()
-            return message
+            return "Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. Faites attention!"
 
         print("scores10")
         logger.debug("Articles found %s", related_articles)
@@ -185,6 +173,7 @@ class WebPage(models.Model):
         print("scores12")
         self.save()
         print("scores13")
+        logger.info(f"Finished computing scores for article {self.url}")
         return self
 
     def _compute_content_score(self, counter_nouns_article, related_articles, nlp):
@@ -243,11 +232,10 @@ class WebPage(models.Model):
                 except (ValueError, LookupError) as e:
                     logger.error("Found page that can't be processed : %s", linked_url)
                     logger.error("Error message : %s", e)
-        if len(related_articles['value']) <= 4:
-            if nb_articles == 0:
-                content_score = 0
-            else:
-                content_score = (interesting_articles / nb_articles * 1000) / 10
+        if nb_articles == 0:
+            content_score = 0
+        elif nb_articles <= 8:
+            content_score = int(interesting_articles / nb_articles * 1000) / 10
         else:
             if len(scores_new_articles) == 0:
                 content_score = 0
@@ -305,9 +293,13 @@ class WebPage(models.Model):
     def from_url(cls, url):
         existing = cls.objects.filter(url=url).first()
 
+        if existing and existing.content_score is None:
+            return 'Cet article est en cours de traitement. Merci de réessayer dans quelques minutes.'
+
         if (existing
                 and existing.scores_version == WebPage.CURRENT_SCORES_VERSION
                 and existing.updated_at > timezone.now() - datetime.timedelta(days=7)):
+            logger.info(f"Returning existing object for url {url}")
             return existing
 
         elif not existing:
