@@ -115,11 +115,6 @@ class WebPage(models.Model):
         logger.debug("nouns4")
         document = ' '.join(document.split())
         logger.debug("nouns5")
-        logger.debug("nouns6")
-        nlp.remove_pipe('parser')
-        logger.debug("nouns7")
-        nlp.remove_pipe('ner')
-        logger.debug("nouns8")
         doc = nlp(document)
         nouns += [w.text for w in doc if ((w.pos_ == "NOUN" or w.pos_ == "PROPN") and len(w.text) > 1)]
         logger.debug("nouns10")
@@ -149,6 +144,11 @@ class WebPage(models.Model):
             return "Oups, nous n'avons pas pu extraire le texte de l'article"
 
         nlp = spacy.load('fr')
+        logger.debug("scores5")
+        nlp.remove_pipe('parser')
+        logger.debug("scoresParserNLP")
+        nlp.remove_pipe('ner')
+        logger.debug("scoresNerNLP")
         nouns_article = self.nouns(article.cleaned_text, nlp)
         logger.debug("scores6")
         counter_nouns_article = Counter(self.tokens(nouns_article))
