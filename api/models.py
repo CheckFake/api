@@ -97,7 +97,7 @@ class WebPage(models.Model):
         return root_words
 
     @staticmethod
-    def nouns(text, nlp):
+    def nouns(text):
         nouns = []
         articleWithoutSpecialCaracters = unidecode(text)
         document = re.sub('[^A-Za-z .\-]+', ' ', articleWithoutSpecialCaracters)
@@ -125,7 +125,7 @@ class WebPage(models.Model):
             self.delete()
             return "Oups, nous n'avons pas pu extraire le texte de l'article"
 
-        nouns_article = self.nouns(article.cleaned_text, nlp)
+        nouns_article = self.nouns(article.cleaned_text)
         counter_nouns_article = Counter(self.tokens(nouns_article))
         logger.debug("Nouns in the article : %s", counter_nouns_article)
 
@@ -137,14 +137,14 @@ class WebPage(models.Model):
 
         logger.debug("Articles found %s", related_articles)
 
-        self._compute_content_score(counter_nouns_article, related_articles, nlp)
+        self._compute_content_score(counter_nouns_article, related_articles)
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
         self.save()
         logger.info(f"Finished computing scores for article {self.url}")
         return self
 
-    def _compute_content_score(self, counter_nouns_article, related_articles, nlp):
+    def _compute_content_score(self, counter_nouns_article, related_articles):
         nb_articles = 0
         interesting_articles = 0
         scores_new_articles = []
@@ -169,7 +169,7 @@ class WebPage(models.Model):
                 try:
                     linked_article = g.extract(url=linked_url)
                     logger.debug("Name of the article: %s", linked_article.title)
-                    new_nouns_article = self.nouns(linked_article.cleaned_text, nlp)
+                    new_nouns_article = self.nouns(linked_article.cleaned_text)
                     new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
                     shared_items = [k for k in counter_nouns_article if
                                     k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
