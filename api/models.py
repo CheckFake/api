@@ -19,6 +19,12 @@ from unidecode import unidecode
 
 logger = logging.getLogger(__name__)
 
+logger.debug("loading NLP")
+nlp = spacy.load('fr')
+nlp.remove_pipe('parser')
+nlp.remove_pipe('ner')
+logger.debug("Finished loading NLP")
+
 
 def get_related_articles(article):
     logger.debug("get1")
@@ -143,12 +149,6 @@ class WebPage(models.Model):
             self.delete()
             return "Oups, nous n'avons pas pu extraire le texte de l'article"
 
-        nlp = spacy.load('fr')
-        logger.debug("scores5")
-        nlp.remove_pipe('parser')
-        logger.debug("scoresParserNLP")
-        nlp.remove_pipe('ner')
-        logger.debug("scoresNerNLP")
         nouns_article = self.nouns(article.cleaned_text, nlp)
         logger.debug("scores6")
         counter_nouns_article = Counter(self.tokens(nouns_article))
