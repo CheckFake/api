@@ -27,24 +27,17 @@ logger.debug("Finished loading NLP")
 
 
 def get_related_articles(article):
-    logger.debug("get1")
     title = article.title
-    logger.debug("get2")
     logger.debug("Title of the article : %s", title)
     # Construct the url for the GET request
     base_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
-    logger.debug("get3")
     params = {
         "q": title,
         "sortBy": "date",
     }
-    logger.debug("get4")
     if article.publish_datetime_utc is not None:
-        logger.debug("get5")
         params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=7)).timestamp()
-        logger.debug("get6")
         logger.debug("Added since param")
-        logger.debug("get7")
     response = requests.get(
         url=base_url,
         params=params,
@@ -52,9 +45,7 @@ def get_related_articles(article):
             "Ocp-Apim-Subscription-Key": os.getenv("BING_SEARCH_API_KEY"),
         },
     )
-    logger.debug("get8")
     if response.status_code == 200:
-        logger.debug("get9")
         return response.json()
 
     return {'value': []}
@@ -99,42 +90,28 @@ class WebPage(models.Model):
 
     @staticmethod
     def tokens(text):
-        logger.debug("tockens1")
         root_words = []
-        logger.debug("tockens2")
         stemmer = SnowballStemmer("french")
-        logger.debug("tockens3")
         for i in range(len(text)):
-            logger.debug("tockens4")
             root_words.append(stemmer.stem(text[i]))
-            logger.debug("tockens5")
         return root_words
 
     @staticmethod
     def nouns(text, nlp):
-        logger.debug("nouns1")
         nouns = []
-        logger.debug("nouns2")
         articleWithoutSpecialCaracters = unidecode(text)
-        logger.debug("nouns3")
         document = re.sub('[^A-Za-z .\-]+', ' ', articleWithoutSpecialCaracters)
-        logger.debug("nouns4")
         document = ' '.join(document.split())
-        logger.debug("nouns5")
         doc = nlp(document)
         nouns += [w.text for w in doc if ((w.pos_ == "NOUN" or w.pos_ == "PROPN") and len(w.text) > 1)]
-        logger.debug("nouns10")
         return nouns
 
     def compute_scores(self):
         logger.debug("Start compute_scores")
-        logger.debug("scores1")
-
         # Extract the title and the text of the article
         g = Goose({
             'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"
         })
-        logger.debug("scores2")
         try:
             article = g.extract(url=self.url)
         except InvalidSchema:
@@ -144,35 +121,26 @@ class WebPage(models.Model):
         # article_counter = Counter(self.tokens(article.cleaned_text))
 
         logger.debug("Text of the article : %s", article.cleaned_text)
-        logger.debug("scores4")
         if article.cleaned_text == "":
             self.delete()
             return "Oups, nous n'avons pas pu extraire le texte de l'article"
 
         nouns_article = self.nouns(article.cleaned_text, nlp)
-        logger.debug("scores6")
         counter_nouns_article = Counter(self.tokens(nouns_article))
-        logger.debug("scores7")
         logger.debug("Nouns in the article : %s", counter_nouns_article)
-        logger.debug("scores8")
 
         related_articles = get_related_articles(article)
-        logger.debug("scores9")
 
         if not related_articles["value"]:
             self.delete()
             return "Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. Faites attention!"
 
-        logger.debug("scores10")
         logger.debug("Articles found %s", related_articles)
 
         self._compute_content_score(counter_nouns_article, related_articles, nlp)
-        logger.debug("scores11")
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
-        logger.debug("scores12")
         self.save()
-        logger.debug("scores13")
         logger.info(f"Finished computing scores for article {self.url}")
         return self
 
@@ -181,50 +149,35 @@ class WebPage(models.Model):
         interesting_articles = 0
         scores_new_articles = []
         dict_interesting_articles = {}
-        logger.debug("compute1")
         parsed_uri = urlparse(self.url)
-        logger.debug("compute2")
         logger.debug("URL parsed")
         g = Goose({
             'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"
         })
-        logger.debug("compute3")
 
         counter_article = 0
         for word in counter_nouns_article:
             if counter_nouns_article[word] > 1:
                 counter_article += 1
-        logger.debug("compute4")
         logger.debug("Weight nouns article : %s", counter_article)
         # Look for similar articles' url
         for link in related_articles['value']:
             linked_url = link['url']
-            logger.debug("compute5")
             logger.debug("Found URL: %s", linked_url)
 
             if parsed_uri.netloc not in linked_url:
                 try:
                     linked_article = g.extract(url=linked_url)
-                    logger.debug("compute6")
                     logger.debug("Name of the article: %s", linked_article.title)
-                    logger.debug("compute7")
                     new_nouns_article = self.nouns(linked_article.cleaned_text, nlp)
-                    logger.debug("compute8")
                     new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
-                    logger.debug("compute9")
                     shared_items = [k for k in counter_nouns_article if
                                     k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
-                    logger.debug("compute10")
                     score_article = len(shared_items) / counter_article
-                    logger.debug("compute11")
                     if score_article > 0.4:
-                        logger.debug("compute12")
                         scores_new_articles.append(score_article)
-                        logger.debug("compute13")
                         interesting_articles += 1
-                        logger.debug("compute14")
                         dict_interesting_articles[linked_url] = linked_article.title
-                        logger.debug("compute15")
                     else:
                         logger.debug("Too low score : %s", score_article)
                     nb_articles += 1
@@ -250,13 +203,9 @@ class WebPage(models.Model):
             else:
                 content_score = 85
         logger.debug("Article score : {}".format(content_score))
-        # logger.debug("Interesting articles : {}".format(dict_interesting_articles))
         self.content_score = content_score
-        logger.debug("compute16")
         self.total_articles = nb_articles
-        logger.debug("compute17")
         self._store_interesting_related_articles(dict_interesting_articles)
-        logger.debug("compute18")
 
     def _store_interesting_related_articles(self, dict_interesting_articles):
         InterestingRelatedArticle.objects.filter(web_page=self).delete()
