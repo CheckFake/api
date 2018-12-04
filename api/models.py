@@ -269,7 +269,11 @@ class WebPage(models.Model):
                 total_articles=0
             )
 
-        return existing.compute_scores()
+        try:
+            return existing.compute_scores()
+        except Exception as e:
+            logger.error(e)
+            raise APIException.error("Erreur inconnue lors du calcul du score.")
 
     def __str__(self):
         return self.url
