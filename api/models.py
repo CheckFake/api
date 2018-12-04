@@ -271,9 +271,11 @@ class WebPage(models.Model):
 
         try:
             return existing.compute_scores()
+        except APIException as e:
+            raise e
         except Exception as e:
-            logger.error(e)
-            raise APIException.error("Erreur inconnue lors du calcul du score.")
+            existing.delete()
+            raise APIException.error("Erreur inconnue lors du calcul du score.", internal_message=str(e))
 
     def __str__(self):
         return self.url

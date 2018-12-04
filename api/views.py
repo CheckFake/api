@@ -37,7 +37,13 @@ def web_page_score_view(request):
             'data': web_page.to_dict()
         })
     except APIException as exception:
-        logger.log(exception.level, f'{exception.message} - {web_page_url}', extra={'request': request})
+        message = exception.message
+        if exception.internal_message:
+            message += f' - {exception.internal_message}'
+        message += f'- {web_page_url}'
+
+        logger.log(exception.level, message, extra={'request': request})
+
         return JsonResponse({
             'status': LOG_LEVELS.get(exception.level, 'unknown'),
             'data': {
