@@ -170,19 +170,22 @@ class WebPage(models.Model):
                 try:
                     linked_article = g.extract(url=linked_url)
                     logger.debug("Name of the article: %s", linked_article.title)
-                    new_nouns_article = self.nouns(linked_article.cleaned_text)
-                    new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
-                    shared_items = [k for k in counter_nouns_article if
-                                    k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
-                    score_article = len(shared_items) / counter_article
-                    if score_article > 0.4:
-                        scores_new_articles.append(score_article)
-                        interesting_articles += 1
-                        dict_interesting_articles[linked_url] = linked_article.title
+                    if "You have been blocked" not in linked_article.title:
+                        new_nouns_article = self.nouns(linked_article.cleaned_text)
+                        new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
+                        shared_items = [k for k in counter_nouns_article if
+                                        k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
+                        score_article = len(shared_items) / counter_article
+                        if score_article > 0.4:
+                            scores_new_articles.append(score_article)
+                            interesting_articles += 1
+                            dict_interesting_articles[linked_url] = linked_article.title
+                        else:
+                            logger.debug("Too low score : %s", score_article)
+                        nb_articles += 1
+                        logger.debug("Percentage for new articles : %s", scores_new_articles)
                     else:
-                        logger.debug("Too low score : %s", score_article)
-                    nb_articles += 1
-                    logger.debug("Percentage for new articles : %s", scores_new_articles)
+                        logger.debug("Article 'You have been blocked not considered!!!'")
                 except (ValueError, LookupError) as e:
                     logger.error("Found page that can't be processed : %s", linked_url)
                     logger.error("Error message : %s", e)
