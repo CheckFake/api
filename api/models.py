@@ -18,6 +18,8 @@ from nltk.stem.snowball import SnowballStemmer
 from requests.exceptions import InvalidSchema
 from unidecode import unidecode
 
+from api.exceptions import APIException
+
 logger = logging.getLogger(__name__)
 
 logger.debug("loading NLP")
@@ -124,7 +126,7 @@ class WebPage(models.Model):
         logger.debug("Text of the article : %s", article.cleaned_text)
         if article.cleaned_text == "":
             self.delete()
-            return "Oups, nous n'avons pas pu extraire le texte de l'article."
+            raise APIException.warning("Oups, nous n'avons pas pu extraire le texte de l'article.")
 
         nouns_article = self.nouns(article.cleaned_text)
         counter_nouns_article = Counter(self.tokens(nouns_article))
@@ -134,7 +136,8 @@ class WebPage(models.Model):
 
         if not related_articles["value"]:
             self.delete()
-            return "Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. Faites attention!"
+            raise APIException.warning("Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. "
+                                       "Faites attention!")
 
         logger.debug("Articles found %s", related_articles)
 
@@ -148,7 +151,7 @@ class WebPage(models.Model):
             self._compute_content_score(counter_nouns_article, related_articles, counter_article)
         else:
             self.delete()
-            return "Notre méthode de calcul n'a pas pu fournir de résultat sur cet article."
+            raise APIException.warning("Notre méthode de calcul n'a pas pu fournir de résultat sur cet article.")
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
         self.save()
@@ -245,7 +248,7 @@ class WebPage(models.Model):
         existing = cls.objects.filter(url=url).first()
 
         if existing and existing.content_score is None:
-            return 'Cet article est en cours de traitement. Merci de réessayer dans quelques minutes.'
+            raise APIException.info('Cet article est en cours de traitement. Merci de réessayer dans quelques minutes.')
 
         if (existing
                 and existing.scores_version == WebPage.CURRENT_SCORES_VERSION
@@ -268,7 +271,13 @@ class WebPage(models.Model):
                 total_articles=0
             )
 
-        return existing.compute_scores()
+        try:
+            return existing.compute_scores()
+        except APIException as e:
+            raise e
+        except Exception as e:
+            existing.delete()
+            raise APIException.error("Erreur lors du calcul du score.", internal_message=str(e))
 
     def __str__(self):
         return self.url

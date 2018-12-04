@@ -2,9 +2,18 @@ import logging
 
 from django.http import JsonResponse
 
+from api.exceptions import APIException
 from api.models import WebPage
 
 logger = logging.getLogger(__name__)
+
+LOG_LEVELS = {
+    50: 'critical',
+    40: 'error',
+    30: 'warning',
+    20: 'info',
+    10: 'debug',
+}
 
 
 def web_page_score_view(request):
@@ -20,19 +29,26 @@ def web_page_score_view(request):
         }, status=400)
 
     logger.info(f"Received request for following URL : {web_page_url}")
-    web_page = WebPage.from_url(url=web_page_url)
-    if isinstance(web_page, str):
-        logger.error(f'{web_page} - {web_page_url}', extra={'request': request})
-        return JsonResponse({
-            'status': 'error',
-            'data': {
-                'message': web_page
-            }
-        })
-    else:
+
+    try:
+        web_page = WebPage.from_url(url=web_page_url)
         return JsonResponse({
             'status': 'success',
             'data': web_page.to_dict()
+        })
+    except APIException as exception:
+        message = exception.message
+        if exception.internal_message:
+            message += f' - {exception.internal_message}'
+        message += f'- {web_page_url}'
+
+        logger.log(exception.level, message, extra={'request': request})
+
+        return JsonResponse({
+            'status': LOG_LEVELS.get(exception.level, 'unknown'),
+            'data': {
+                'message': exception.message
+            }
         })
 
 
