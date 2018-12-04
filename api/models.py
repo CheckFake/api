@@ -16,6 +16,7 @@ from goose3 import Goose
 from nltk.stem.snowball import SnowballStemmer
 from requests.exceptions import InvalidSchema
 from unidecode import unidecode
+from statistics import mean
 
 logger = logging.getLogger(__name__)
 
@@ -185,23 +186,13 @@ class WebPage(models.Model):
                 except (ValueError, LookupError) as e:
                     logger.error("Found page that can't be processed : %s", linked_url)
                     logger.error("Error message : %s", e)
-        if nb_articles == 0:
-            content_score = 0
-        elif nb_articles <= 8:
-            content_score = int(interesting_articles / nb_articles * 1000) / 10
+
+        # Calcul du score de l'article
+        if nb_articles >= 7 and len(scores_new_articles) > 0:
+            content_score = ((int(interesting_articles / nb_articles * 1000) / 10) + (int((mean(scores_new_articles) * 1.5) * 1000) / 10)) / 2
         else:
-            if len(scores_new_articles) == 0:
-                content_score = 0
-            elif len(scores_new_articles) == 1:
-                content_score = 10
-            elif len(scores_new_articles) == 2:
-                content_score = 30
-            elif len(scores_new_articles) == 3:
-                content_score = 50
-            elif len(scores_new_articles) == 4 or len(scores_new_articles) == 5:
-                content_score = 70
-            else:
-                content_score = 85
+            content_score = int(interesting_articles / nb_articles * 1000) / 10
+
         logger.debug("Article score : {}".format(content_score))
         self.content_score = content_score
         self.total_articles = nb_articles
