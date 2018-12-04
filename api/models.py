@@ -124,7 +124,7 @@ class WebPage(models.Model):
         logger.debug("Text of the article : %s", article.cleaned_text)
         if article.cleaned_text == "":
             self.delete()
-            return "Oups, nous n'avons pas pu extraire le texte de l'article"
+            return "Oups, nous n'avons pas pu extraire le texte de l'article."
 
         nouns_article = self.nouns(article.cleaned_text)
         counter_nouns_article = Counter(self.tokens(nouns_article))
@@ -138,14 +138,24 @@ class WebPage(models.Model):
 
         logger.debug("Articles found %s", related_articles)
 
-        self._compute_content_score(counter_nouns_article, related_articles)
+        counter_article = 0
+        for word in counter_nouns_article:
+            if counter_nouns_article[word] > 1:
+                counter_article += 1
+        logger.debug("Number of interesting nouns : %s", counter_article)
+
+        if counter_article > 0:
+            self._compute_content_score(counter_nouns_article, related_articles, counter_article)
+        else:
+            self.delete()
+            return "Notre méthode de calcul n'a pas pu fournir de résultat sur cet article."
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
         self.save()
         logger.info(f"Finished computing scores for article {self.url}")
         return self
 
-    def _compute_content_score(self, counter_nouns_article, related_articles):
+    def _compute_content_score(self, counter_nouns_article, related_articles, counter_article):
         nb_articles = 0
         interesting_articles = 0
         scores_new_articles = []
@@ -156,11 +166,6 @@ class WebPage(models.Model):
             'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"
         })
 
-        counter_article = 0
-        for word in counter_nouns_article:
-            if counter_nouns_article[word] > 1:
-                counter_article += 1
-        logger.debug("Weight nouns article : %s", counter_article)
         # Look for similar articles' url
         for link in related_articles['value']:
             linked_url = link['url']
