@@ -4,6 +4,7 @@ import logging
 import os
 import re
 from collections import Counter
+from statistics import mean
 from urllib.parse import urlparse
 
 import requests
@@ -16,7 +17,6 @@ from goose3 import Goose
 from nltk.stem.snowball import SnowballStemmer
 from requests.exceptions import InvalidSchema
 from unidecode import unidecode
-from statistics import mean
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +192,8 @@ class WebPage(models.Model):
 
         # Calcul du score de l'article
         if nb_articles >= 7 and len(scores_new_articles) > 0:
-            content_score = ((int(interesting_articles / nb_articles * 1000) / 10) + (int((mean(scores_new_articles) * 1.5) * 1000) / 10)) / 2
+            content_score = ((int(interesting_articles / nb_articles * 1000) / 10) + (
+                        int((mean(scores_new_articles) * 1.5) * 1000) / 10)) / 2
         else:
             content_score = int(interesting_articles / nb_articles * 1000) / 10
 

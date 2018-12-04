@@ -17,7 +17,6 @@ django-cors-middleware = "*"
 nltk = "*"
 unidecode = "*"
 spacy = "*"
-statistics = "*"
 
 [dev-packages]
 
