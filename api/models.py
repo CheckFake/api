@@ -148,7 +148,7 @@ class WebPage(models.Model):
             self._compute_content_score(counter_nouns_article, related_articles, counter_article)
         else:
             self.delete()
-            return "Notre méthode de calcul n'a pas fournir de résultat sur cet article."
+            return "Notre méthode de calcul n'a pas pu fournir de résultat sur cet article."
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
         self.save()
