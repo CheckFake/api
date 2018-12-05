@@ -151,7 +151,7 @@ class WebPage(models.Model):
             self._compute_content_score(counter_nouns_article, related_articles, counter_article)
         else:
             self.delete()
-            raise APIException.error("Notre méthode de calcul n'a pas pu fournir de résultat sur cet article.")
+            raise APIException.warning("Notre méthode de calcul n'a pas pu fournir de résultat sur cet article.")
 
         self.scores_version = WebPage.CURRENT_SCORES_VERSION
         self.save()
@@ -277,7 +277,7 @@ class WebPage(models.Model):
             raise e
         except Exception as e:
             existing.delete()
-            raise APIException.error("Erreur inconnue lors du calcul du score.", internal_message=str(e))
+            raise APIException.error("Erreur lors du calcul du score.", internal_message=str(e))
 
     def __str__(self):
         return self.url
