@@ -167,3 +167,5 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 EMAIL_BACKEND = 'django_mailgun.MailgunBackend'
 MAILGUN_ACCESS_KEY = os.getenv('MAILGUN_ACCESS_KEY', '')
 MAILGUN_SERVER_NAME = os.getenv('MAILGUN_SERVER_NAME', '')
+
+LOAD_NLP = os.getenv('LOAD_NLP', 'False').lower() == 'true'

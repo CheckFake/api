@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 import requests
 import spacy
 import tldextract
+from django.conf import settings
 from django.db import models
 from django.db.models import Avg
 from django.utils import timezone
@@ -22,11 +23,12 @@ from api.exceptions import APIException
 
 logger = logging.getLogger(__name__)
 
-logger.debug("loading NLP")
-nlp = spacy.load('fr')
-nlp.remove_pipe('parser')
-nlp.remove_pipe('ner')
-logger.debug("Finished loading NLP")
+if settings.LOAD_NLP:
+    logger.debug("loading NLP")
+    nlp = spacy.load('fr')
+    nlp.remove_pipe('parser')
+    nlp.remove_pipe('ner')
+    logger.debug("Finished loading NLP")
 
 
 def get_related_articles(article):
@@ -201,7 +203,7 @@ class WebPage(models.Model):
         # Calcul du score de l'article
         if nb_articles >= 7 and len(scores_new_articles) > 0:
             content_score = ((int(interesting_articles / nb_articles * 1000) / 10) + (
-                        int((mean(scores_new_articles) * 1.5) * 1000) / 10)) / 2
+                    int((mean(scores_new_articles) * 1.5) * 1000) / 10)) / 2
         elif nb_articles == 0:
             content_score = 0
         else:
