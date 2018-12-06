@@ -31,7 +31,7 @@ if settings.LOAD_NLP:
     logger.debug("Finished loading NLP")
 
 
-def get_related_articles(article, delai):
+def get_related_articles(article, delay):
     title = article.title
     logger.debug("Title of the article : %s", title)
     # Construct the url for the GET request
@@ -41,7 +41,7 @@ def get_related_articles(article, delai):
         "sortBy": "date",
     }
     if article.publish_datetime_utc is not None:
-        params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delai)).timestamp()
+        params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delay)).timestamp()
         logger.debug("Added since param")
     response = requests.get(
         url=base_url,
@@ -221,7 +221,8 @@ class WebPage(models.Model):
         if nb_articles == 0 or interesting_articles == 0:
             content_score = 0
         else:
-            content_score = ((int(interesting_articles / nb_articles * 1000) / 10) + min(100.0, (int((mean(scores_new_articles) * 1.5) * 1000) / 10))) / 2
+            content_score = ((int(interesting_articles / nb_articles * 1000) / 10) + min(100.0, (
+                        int((mean(scores_new_articles) * 1.5) * 1000) / 10))) / 2
 
         logger.debug("Article score : {}".format(content_score))
         self.content_score = content_score
