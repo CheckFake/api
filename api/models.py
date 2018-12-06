@@ -132,17 +132,13 @@ class WebPage(models.Model):
 
         related_articles = get_related_articles(article, 7)
 
-        only_same_publisher = False
-        if len(related_articles["value"]) == 1:
-            linked_url = related_articles["value"][0]['url']
-            logger.debug("Found URL for len(related_articles) == 1: %s", linked_url)
-            parsed_uri = urlparse(self.url)
-            if parsed_uri.netloc in linked_url:
-                only_same_publisher = True
+        only_same_publisher = self.check_same_publisher(related_articles)
 
         if not related_articles["value"] or only_same_publisher is True:
             logger.debug("No article found, try with a period of 30 days before publishing.")
             related_articles = get_related_articles(article, 30)
+
+            only_same_publisher = self.check_same_publisher(related_articles)
             if not related_articles["value"] or only_same_publisher is True:
                 self.delete()
                 return "Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. Faites attention!"
@@ -165,6 +161,16 @@ class WebPage(models.Model):
         self.save()
         logger.info(f"Finished computing scores for article {self.url}")
         return self
+
+    def check_same_publisher(self, related_articles):
+        only_same_publisher = False
+        if len(related_articles["value"]) == 1:
+            linked_url = related_articles["value"][0]['url']
+            logger.debug("Found URL for len(related_articles) == 1: %s", linked_url)
+            parsed_uri = urlparse(self.url)
+            if parsed_uri.netloc in linked_url:
+                only_same_publisher = True
+        return only_same_publisher
 
     def _compute_content_score(self, counter_nouns_article, related_articles, counter_article):
         nb_articles = 0
