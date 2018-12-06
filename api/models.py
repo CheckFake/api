@@ -138,8 +138,8 @@ class WebPage(models.Model):
 
         if not related_articles["value"]:
             self.delete()
-            raise APIException.warning("Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. "
-                                       "Faites attention!")
+            raise APIException.info("Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. "
+                                    "Faites attention!")
 
         logger.debug("Articles found %s", related_articles)
 
