@@ -26,11 +26,10 @@ SECRET_KEY = os.getenv('SECRET_KEY', '$a^7vw@ktn0mbnbd5(vs4em-(yy1ufrx$=g@r6ihbc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_ENV', 'prod') == 'dev'
 
-ALLOWED_HOSTS = ['fakenewsdetector.augendre.info', 'web', 'fakenewsdetector', '127.0.0.1']
+ALLOWED_HOSTS = ['fakenewsdetector.augendre.info', 'web', 'fakenewsdetector', '127.0.0.1', 'localhost']
 if DEBUG:
     ALLOWED_HOSTS.extend([
-        'localhost',
-        os.getenv('CURRENT_IP', '192.168.1.27')
+        os.getenv('CURRENT_IP', '192.168.1.27'),
     ])
 host = os.getenv('HOST', None)
 if host:
@@ -167,3 +166,5 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 EMAIL_BACKEND = 'django_mailgun.MailgunBackend'
 MAILGUN_ACCESS_KEY = os.getenv('MAILGUN_ACCESS_KEY', '')
 MAILGUN_SERVER_NAME = os.getenv('MAILGUN_SERVER_NAME', '')
+
+LOAD_NLP = os.getenv('LOAD_NLP', 'False').lower() == 'true'
