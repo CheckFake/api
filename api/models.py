@@ -206,7 +206,7 @@ class WebPage(models.Model):
                         if score_article > 0.4:
                             scores_new_articles.append(score_article)
                             interesting_articles += 1
-                            dict_interesting_articles[linked_url] = linked_article.title
+                            dict_interesting_articles[linked_url] = (linked_article.title, score_article)
                         else:
                             logger.debug("Too low score : %s", score_article)
                         nb_articles += 1
@@ -231,8 +231,9 @@ class WebPage(models.Model):
 
     def _store_interesting_related_articles(self, dict_interesting_articles):
         InterestingRelatedArticle.objects.filter(web_page=self).delete()
-        for url, title in dict_interesting_articles.items():
-            InterestingRelatedArticle.objects.create(title=title, url=url, web_page=self)
+        for url, (title, score) in dict_interesting_articles.items():
+            score = int(score * 100)
+            InterestingRelatedArticle.objects.create(title=title, url=url, score=score, web_page=self)
 
     def to_dict(self):
         fields_to_serialize = [
@@ -249,7 +250,7 @@ class WebPage(models.Model):
             cache_file='api/external_data/public_suffixes_list.dat',
             include_psl_private_domains=True
         )
-        for article in self.interesting_related_articles.order_by('?')[:3]:
+        for article in self.interesting_related_articles.order_by('-score')[:3]:
             url_extraction = tld_extract(article.url)
             base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
             self_serialized['related_articles_selection'].append({
@@ -303,4 +304,5 @@ class WebPage(models.Model):
 class InterestingRelatedArticle(models.Model):
     title = models.CharField(max_length=500)
     url = models.URLField(max_length=500)
+    score = models.PositiveIntegerField()
     web_page = models.ForeignKey(WebPage, on_delete=models.CASCADE, related_name='interesting_related_articles')
