@@ -146,7 +146,7 @@ class WebPage(models.Model):
             if not related_articles["value"] or only_same_publisher is True:
                 self.delete()
                 raise APIException.info("Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. "
-                                    "Faites attention!")
+                                        "Faites attention!")
 
         logger.debug("Articles found %s", related_articles)
 
@@ -221,8 +221,8 @@ class WebPage(models.Model):
         if nb_articles == 0 or interesting_articles == 0:
             content_score = 0
         else:
-            content_score = ((int(interesting_articles / nb_articles * 1000) / 10) + min(100.0, (
-                        int((mean(scores_new_articles) * 1.5) * 1000) / 10))) / 2
+            content_score = ((int(interesting_articles / nb_articles * 1000) / 10)
+                             + min(100.0, (int((mean(scores_new_articles) * 1.5) * 1000) / 10))) / 2
 
         logger.debug("Article score : {}".format(content_score))
         self.content_score = content_score
