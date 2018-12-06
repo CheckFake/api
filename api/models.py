@@ -27,7 +27,7 @@ nlp.remove_pipe('ner')
 logger.debug("Finished loading NLP")
 
 
-def get_related_articles(article):
+def get_related_articles(article, delai):
     title = article.title
     logger.debug("Title of the article : %s", title)
     # Construct the url for the GET request
@@ -37,7 +37,7 @@ def get_related_articles(article):
         "sortBy": "date",
     }
     if article.publish_datetime_utc is not None:
-        params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=7)).timestamp()
+        params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delai)).timestamp()
         logger.debug("Added since param")
     response = requests.get(
         url=base_url,
@@ -53,7 +53,7 @@ def get_related_articles(article):
 
 
 class WebPage(models.Model):
-    CURRENT_SCORES_VERSION = 12
+    CURRENT_SCORES_VERSION = 13
 
     url = models.URLField(unique=True, max_length=500)
     content_score = models.PositiveIntegerField(blank=True, null=True)
@@ -130,11 +130,22 @@ class WebPage(models.Model):
         counter_nouns_article = Counter(self.tokens(nouns_article))
         logger.debug("Nouns in the article : %s", counter_nouns_article)
 
-        related_articles = get_related_articles(article)
+        related_articles = get_related_articles(article, 7)
 
-        if not related_articles["value"]:
-            self.delete()
-            return "Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. Faites attention!"
+        only_same_publisher = False
+        if len(related_articles["value"]) == 1:
+            linked_url = related_articles["value"][0]['url']
+            logger.debug("Found URL for len(related_articles) == 1: %s", linked_url)
+            parsed_uri = urlparse(self.url)
+            if parsed_uri.netloc in linked_url:
+                only_same_publisher = True
+
+        if not related_articles["value"] or only_same_publisher is True:
+            logger.debug("No article found, try with a period of 30 days before publishing.")
+            related_articles = get_related_articles(article, 30)
+            if not related_articles["value"] or only_same_publisher is True:
+                self.delete()
+                return "Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. Faites attention!"
 
         logger.debug("Articles found %s", related_articles)
 
@@ -144,7 +155,7 @@ class WebPage(models.Model):
                 counter_article += 1
         logger.debug("Number of interesting nouns : %s", counter_article)
 
-        if counter_article > 0:
+        if counter_article > 2:
             self._compute_content_score(counter_nouns_article, related_articles, counter_article)
         else:
             self.delete()
@@ -171,6 +182,7 @@ class WebPage(models.Model):
             linked_url = link['url']
             logger.debug("Found URL: %s", linked_url)
 
+
             if parsed_uri.netloc not in linked_url:
                 try:
                     linked_article = g.extract(url=linked_url)
@@ -196,13 +208,10 @@ class WebPage(models.Model):
                     logger.error("Error message : %s", e)
 
         # Calcul du score de l'article
-        if nb_articles >= 7 and len(scores_new_articles) > 0:
-            content_score = ((int(interesting_articles / nb_articles * 1000) / 10) + (
-                        int((mean(scores_new_articles) * 1.5) * 1000) / 10)) / 2
-        elif nb_articles == 0:
+        if nb_articles == 0 or interesting_articles == 0:
             content_score = 0
         else:
-            content_score = int(interesting_articles / nb_articles * 1000) / 10
+            content_score = ((int(interesting_articles / nb_articles * 1000) / 10) + min(100.0, (int((mean(scores_new_articles) * 1.5) * 1000) / 10))) / 2
 
         logger.debug("Article score : {}".format(content_score))
         self.content_score = content_score
