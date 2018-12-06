@@ -180,8 +180,8 @@ class WebPage(models.Model):
     def _compute_content_score(self, counter_nouns_article, related_articles, counter_article):
         nb_articles = 0
         interesting_articles = 0
-        scores_new_articles = []
-        dict_interesting_articles = {}
+        scores_new_articles = {}
+        list_interesting_articles = {}
         parsed_uri = urlparse(self.url)
         logger.debug("URL parsed")
         g = Goose({
@@ -204,9 +204,9 @@ class WebPage(models.Model):
                                         k in new_counter_nouns_articles and counter_nouns_article[k] > 1]
                         score_article = len(shared_items) / counter_article
                         if score_article > 0.4:
-                            scores_new_articles.append(score_article)
+                            scores_new_articles[linked_url] = score_article
                             interesting_articles += 1
-                            dict_interesting_articles[linked_url] = linked_article.title
+                            #dict_interesting_articles[linked_url] = linked_article.title
                         else:
                             logger.debug("Too low score : %s", score_article)
                         nb_articles += 1
@@ -217,16 +217,26 @@ class WebPage(models.Model):
                     logger.error("Found page that can't be processed : %s", linked_url)
                     logger.error("Error message : %s", e)
 
+        logger.debug("Get scores only")
+        scores = [scores_new_articles[key] for key in scores_new_articles]
         # Calcul du score de l'article
+        logger.debug("Compute score")
         if nb_articles == 0 or interesting_articles == 0:
             content_score = 0
         else:
-            content_score = ((int(interesting_articles / nb_articles * 1000) / 10) + min(100.0, (int((mean(scores_new_articles) * 1.5) * 1000) / 10))) / 2
+            content_score = ((int(interesting_articles / nb_articles * 1000) / 10) + min(100.0, (int((mean(scores) * 1.5) * 1000) / 10))) / 2
+
+        #logger.debug("List of interesting articles : %s", scores_new_articles)
+        #sorted_scores = sorted(scores_new_articles.items(), key=lambda kv: kv[1], reverse=True))
+
+        logger.debug("Get url sorted")
+        list_interesting_articles = list(map(lambda kv: kv[0], sorted(scores_new_articles.items(), key=lambda kv: kv[1], reverse=True)))
+        logger.debug("List of sorted inverse url : %s", list_interesting_articles)
 
         logger.debug("Article score : {}".format(content_score))
         self.content_score = content_score
         self.total_articles = nb_articles
-        self._store_interesting_related_articles(dict_interesting_articles)
+        self._store_interesting_related_articles(list_interesting_articles)
 
     def _store_interesting_related_articles(self, dict_interesting_articles):
         InterestingRelatedArticle.objects.filter(web_page=self).delete()
@@ -302,4 +312,5 @@ class WebPage(models.Model):
 class InterestingRelatedArticle(models.Model):
     title = models.CharField(max_length=500)
     url = models.URLField(max_length=500)
+    score = models.(max_length=500)
     web_page = models.ForeignKey(WebPage, on_delete=models.CASCADE, related_name='interesting_related_articles')
