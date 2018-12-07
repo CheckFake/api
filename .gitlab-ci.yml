@@ -25,6 +25,7 @@ deploy:
     - docker tag $CONTAINER_TEST_IMAGE $DOCKER_HUB_IMAGE
     - docker login --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD
     - docker push $DOCKER_HUB_IMAGE
+    - apk add --update --no-cache curl
     - curl -X GET "$WEBHOOK_URL"
   only:
     - master
