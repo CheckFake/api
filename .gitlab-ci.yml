@@ -27,5 +27,8 @@ deploy:
     - docker push $DOCKER_HUB_IMAGE
     - apk add --update --no-cache curl
     - curl -X GET "$WEBHOOK_URL"
+  environment:
+    name: production
+    url: https://fakenewsdetector.augendre.info
   only:
     - master
