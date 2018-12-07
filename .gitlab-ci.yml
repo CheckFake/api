@@ -1,0 +1,31 @@
+image: docker:stable
+services:
+  - docker:dind
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_DRIVER: overlay2
+  CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+
+before_script:
+  - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
+
+build-master:
+  stage: build
+  script:
+    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:latest -t $CONTAINER_TEST_IMAGE -t $CI_REGISTRY_IMAGE:latest .
+    - docker push $CONTAINER_TEST_IMAGE
+    - docker push $CI_REGISTRY_IMAGE:latest
+
+deploy:
+  stage: deploy
+  script:
+    - docker pull $CONTAINER_TEST_IMAGE
+    - docker tag $CONTAINER_TEST_IMAGE $DOCKER_HUB_IMAGE
+    - docker login --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD
+    - docker push $DOCKER_HUB_IMAGE
+    - apk add --update --no-cache curl
+    - curl -X GET "$WEBHOOK_URL"
+  only:
+    - master
