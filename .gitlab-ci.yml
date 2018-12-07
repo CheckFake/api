@@ -17,3 +17,14 @@ build-master:
     - docker build --cache-from $CI_REGISTRY_IMAGE:latest -t $CONTAINER_TEST_IMAGE -t $CI_REGISTRY_IMAGE:latest .
     - docker push $CONTAINER_TEST_IMAGE
     - docker push $CI_REGISTRY_IMAGE:latest
+
+deploy:
+  stage: deploy
+  script:
+    - docker pull $CONTAINER_TEST_IMAGE
+    - docker tag $CONTAINER_TEST_IMAGE $DOCKER_HUB_IMAGE
+    - docker login --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD
+    - docker push $DOCKER_HUB_IMAGE
+    - curl -X GET "$WEBHOOK_URL"
+  only:
+    - master
