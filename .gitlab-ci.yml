@@ -36,6 +36,22 @@ smoke-test:
     - LOAD_NLP="True" pipenv run gunicorn fake_news_detector_api.wsgi -b 0.0.0.0:8000 -t 600 -k gthread --threads 4 --log-file - &
     - sleep 15 && pipenv run python smoke_test.py
 
+tests:
+  stage: test
+  image: $CONTAINER_TEST_IMAGE
+  services:
+    - postgres:9.6-alpine
+  variables:
+    DATABASE_URL: postgres://postgres:postgres@postgres/postgres
+    SECRET_KEY: test
+    GIT_STRATEGY: none
+  before_script:
+    - echo "overriding docker login"
+  script:
+    - cd /app
+    - pipenv run python manage.py migrate
+    - pipenv run python manage.py test
+
 deploy:
   stage: deploy
   variables:
