@@ -32,7 +32,8 @@ smoke-test:
     - echo "overriding docker login"
   script:
     - cd /app
-    - pipenv run python healthcheck.py
+    - ./bash/run-prod.sh &
+    - sleep 15 && pipenv run python smoke_test.py
 
 deploy:
   stage: deploy

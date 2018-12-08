@@ -5,10 +5,10 @@ import requests
 from requests import RequestException
 
 
-def main():
+def main(timeout=10):
     port = os.getenv('PORT', 8000)
     try:
-        res = requests.get(f'http://127.0.0.1:{port}/api/ping', timeout=10)
+        res = requests.get(f'http://127.0.0.1:{port}/api/ping', timeout=timeout)
         res.raise_for_status()
 
         if res.json().get('status') != 'alive':
