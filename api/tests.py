@@ -21,6 +21,15 @@ class WebPageTestCase(TestCase):
         }
         self.assertTrue(self.page.check_same_publisher(related_articles))
 
+    def test_check_same_publisher_two_same(self):
+        related_articles = {
+            "value": [
+                {'url': 'https://example.com/otherarticle'},
+                {'url': 'https://example.com/otherarticle2'},
+            ]
+        }
+        self.assertTrue(self.page.check_same_publisher(related_articles))
+
     def test_check_same_publisher_two_others(self):
         related_articles = {
             "value": [

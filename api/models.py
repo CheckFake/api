@@ -168,13 +168,16 @@ class WebPage(models.Model):
         return self
 
     def check_same_publisher(self, related_articles):
-        only_same_publisher = False
-        if len(related_articles["value"]) == 1:
-            linked_url = related_articles["value"][0]['url']
-            logger.debug("Found URL for len(related_articles) == 1: %s", linked_url)
+        if not related_articles["value"]:
+            return False
+
+        only_same_publisher = True
+        for article in related_articles["value"]:
+            linked_url = article['url']
             parsed_uri = urlparse(self.url)
-            if parsed_uri.netloc in linked_url:
-                only_same_publisher = True
+            if parsed_uri.netloc not in linked_url:
+                only_same_publisher &= False
+
         return only_same_publisher
 
     def _compute_content_score(self, counter_nouns_article, related_articles, counter_article):
