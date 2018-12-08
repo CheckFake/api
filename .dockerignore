@@ -2,3 +2,5 @@
 .gitlab-ci.yml
 .python-version
 *.env
+.coverage
+htmlcov
