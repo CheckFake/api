@@ -1,0 +1,4 @@
+*.sqlite3
+.gitlab-ci.yml
+.python-version
+*.env
