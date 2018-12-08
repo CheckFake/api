@@ -19,6 +19,18 @@ build-master:
     - docker push $CONTAINER_TEST_IMAGE
     - docker push $CI_REGISTRY_IMAGE:latest
 
+smoke-test:
+  stage: test
+  services:
+    - postgres:9.6-alpine
+  variables:
+    DATABASE_URL: postgres://postgres:postgres@postgres/postgres
+    SECRET_KEY: test
+  script:
+    - docker run --rm -e SECRET_KEY=$SECRET_KEY -e DATABASE_URL=$DATABASE_URL -p 8000:8000 $CONTAINER_TEST_IMAGE
+    - apk add --update --no-cache curl
+    - curl -v -X GET "http://docker:8000"
+
 deploy:
   stage: deploy
   script:
