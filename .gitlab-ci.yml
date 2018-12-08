@@ -50,7 +50,8 @@ tests:
   script:
     - cd /app
     - pipenv run python manage.py migrate
-    - pipenv run python manage.py test
+    - pipenv run coverage run --source='.' manage.py test
+    - pipenv run coverage report
 
 deploy:
   stage: deploy
