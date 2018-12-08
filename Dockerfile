@@ -15,7 +15,7 @@ RUN pipenv install && apk del .build-deps
 RUN pipenv run python -m spacy download fr
 
 COPY bash/ ./bash/
-COPY manage.py healthcheck.py ./
+COPY manage.py healthcheck.py smoke_test.py ./
 COPY fake_news_detector_api/ ./fake_news_detector_api/
 COPY api/ ./api/
 
