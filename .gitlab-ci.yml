@@ -27,11 +27,17 @@ smoke-test:
   variables:
     DATABASE_URL: postgres://postgres:postgres@postgres/postgres
     SECRET_KEY: test
+    GIT_STRATEGY: none
+  before_script:
+    - echo "overriding docker login"
   script:
+    - cd /app
     - pipenv run python healthcheck.py
 
 deploy:
   stage: deploy
+  variables:
+    GIT_STRATEGY: none
   script:
     - docker pull $CONTAINER_TEST_IMAGE
     - docker tag $CONTAINER_TEST_IMAGE $DOCKER_HUB_IMAGE
