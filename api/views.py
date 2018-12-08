@@ -53,7 +53,7 @@ def ping_view(request):
     try:
         page = str(WebPage.objects.last())
         return JsonResponse({
-            'status': 'dead'
+            'status': 'alive'
         })
     except Exception:
         logger.critical("Error while trying to access DB when responding to healthcheck")
