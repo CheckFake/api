@@ -14,7 +14,8 @@ build-master:
   stage: build
   script:
     - docker pull $CI_REGISTRY_IMAGE:latest || true
-    - docker build --cache-from $CI_REGISTRY_IMAGE:latest -t $CONTAINER_TEST_IMAGE -t $CI_REGISTRY_IMAGE:latest .
+    - docker pull $CONTAINER_TEST_IMAGE || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:latest --cache-from $CONTAINER_TEST_IMAGE -t $CONTAINER_TEST_IMAGE -t $CI_REGISTRY_IMAGE:latest .
     - docker push $CONTAINER_TEST_IMAGE
     - docker push $CI_REGISTRY_IMAGE:latest
 
@@ -27,5 +28,8 @@ deploy:
     - docker push $DOCKER_HUB_IMAGE
     - apk add --update --no-cache curl
     - curl -X GET "$WEBHOOK_URL"
+  environment:
+    name: production
+    url: https://fakenewsdetector.augendre.info
   only:
     - master

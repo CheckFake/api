@@ -14,7 +14,10 @@ COPY Pipfile Pipfile.lock ./
 RUN pipenv install && apk del .build-deps
 RUN pipenv run python -m spacy download fr
 
-COPY . ./
+COPY bash/ ./bash/
+COPY manage.py healthcheck.py ./
+COPY fake_news_detector_api/ ./fake_news_detector_api/
+COPY api/ ./api/
 
 CMD ["sh", "bash/run-prod.sh"]
 
