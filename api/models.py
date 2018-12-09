@@ -5,6 +5,7 @@ import os
 import re
 from collections import Counter
 from statistics import mean
+from typing import List, Union
 from urllib.parse import urlparse
 
 import requests
@@ -12,7 +13,7 @@ import spacy
 import tldextract
 from django.conf import settings
 from django.db import models
-from django.db.models import Avg
+from django.db.models import Avg, QuerySet
 from django.utils import timezone
 from goose3 import Goose
 from nltk.stem.snowball import SnowballStemmer
@@ -31,7 +32,7 @@ if settings.LOAD_NLP:
     logger.debug("Finished loading NLP")
 
 
-def get_related_articles(article, delay):
+def get_related_articles(article, delay) -> dict:
     title = article.title
     logger.debug("Title of the article : %s", title)
     # Construct the url for the GET request
@@ -67,34 +68,34 @@ class WebPage(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    def _site_score_queryset(self):
+    def _site_score_queryset(self) -> Union[QuerySet, List['WebPage']]:
         return (WebPage.objects
                 .filter(base_domain=self.base_domain)
                 .filter(scores_version=WebPage.CURRENT_SCORES_VERSION))
 
     @property
-    def site_score_articles_count(self):
+    def site_score_articles_count(self) -> int:
         return self._site_score_queryset().count()
 
     @property
-    def interesting_related_articles_count(self):
+    def interesting_related_articles_count(self) -> int:
         return self.interesting_related_articles.count()
 
     @property
-    def site_score(self):
+    def site_score(self) -> float:
         raw_site_score = (self._site_score_queryset()
                           .aggregate(site_score=Avg('content_score'))
                           )['site_score']
         return int(raw_site_score * 10) / 10
 
     @property
-    def global_score(self):
+    def global_score(self) -> float:
         # allows to focus on the content if the site is "serious" and to focus on the site otherwise
         final_score = (100 - self.site_score) / 100 * self.site_score + self.site_score * self.content_score / 100
         return int(final_score * 10) / 10
 
     @staticmethod
-    def tokens(text):
+    def tokens(text) -> List[str]:
         root_words = []
         stemmer = SnowballStemmer("french")
         for i in range(len(text)):
@@ -102,7 +103,7 @@ class WebPage(models.Model):
         return root_words
 
     @staticmethod
-    def nouns(text):
+    def nouns(text) -> List[str]:
         nouns = []
         articleWithoutSpecialCaracters = unidecode(text)
         document = re.sub('[^A-Za-z .\-]+', ' ', articleWithoutSpecialCaracters)
@@ -111,7 +112,7 @@ class WebPage(models.Model):
         nouns += [w.text for w in doc if ((w.pos_ == "NOUN" or w.pos_ == "PROPN") and len(w.text) > 1)]
         return nouns
 
-    def compute_scores(self):
+    def compute_scores(self) -> 'WebPage':
         logger.debug("Start compute_scores")
         # Extract the title and the text of the article
         g = Goose({
@@ -167,7 +168,7 @@ class WebPage(models.Model):
         logger.info(f"Finished computing scores for article {self.url}")
         return self
 
-    def check_same_publisher(self, related_articles):
+    def check_same_publisher(self, related_articles: dict) -> bool:
         if not related_articles["value"]:
             return False
 
@@ -180,7 +181,7 @@ class WebPage(models.Model):
 
         return only_same_publisher
 
-    def _compute_content_score(self, counter_nouns_article, related_articles, counter_article):
+    def _compute_content_score(self, counter_nouns_article: Counter, related_articles: dict, counter_article: int) -> None:
         nb_articles = 0
         interesting_articles = 0
         scores_new_articles = []
@@ -232,13 +233,13 @@ class WebPage(models.Model):
         self.total_articles = nb_articles
         self._store_interesting_related_articles(dict_interesting_articles)
 
-    def _store_interesting_related_articles(self, dict_interesting_articles):
+    def _store_interesting_related_articles(self, dict_interesting_articles: dict) -> None:
         InterestingRelatedArticle.objects.filter(web_page=self).delete()
         for url, (title, score) in dict_interesting_articles.items():
             score = int(score * 100)
             InterestingRelatedArticle.objects.create(title=title, url=url, score=score, web_page=self)
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         fields_to_serialize = [
             'url', 'global_score', 'total_articles',
             'site_score_articles_count', 'interesting_related_articles_count'
@@ -265,7 +266,7 @@ class WebPage(models.Model):
         return self_serialized
 
     @classmethod
-    def from_url(cls, url):
+    def from_url(cls, url: str) -> 'WebPage':
         existing = cls.objects.filter(url=url).first()
 
         if existing and existing.content_score is None:
