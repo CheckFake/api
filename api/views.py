@@ -55,8 +55,8 @@ def ping_view(request):
         return JsonResponse({
             'status': 'alive'
         })
-    except Exception:
-        logger.critical("Error while trying to access DB when responding to healthcheck")
+    except Exception as e:
+        logger.critical(f"Error while trying to access DB when responding to healthcheck: {e}")
         return JsonResponse({
             'status': 'dead'
         })
