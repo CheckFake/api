@@ -121,7 +121,7 @@ class WebPage(models.Model):
             article = g.extract(url=self.url)
         except InvalidSchema:
             self.delete()
-            return f"Schéma invalide"
+            raise APIException.warning("Schéma invalide")
 
         # article_counter = Counter(self.tokens(article.cleaned_text))
 
