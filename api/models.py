@@ -208,7 +208,7 @@ class WebPage(models.Model):
                     logger.debug("Name of the article: %s", linked_article.title)
 
                     if "You have been blocked" in linked_article.title:
-                        logger.debug("Article 'You have been blocked not considered!!!'")
+                        logger.debug("Article 'You have been blocked' not considered")
                         blocked_counter += 1
                     elif SequenceMatcher(None, article.cleaned_text, linked_article.cleaned_text).ratio() > 0.3:
                         logger.debug("Article with content too similar not considered")
