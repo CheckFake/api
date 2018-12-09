@@ -1,5 +1,6 @@
 from django.test import TestCase
 
+from api.exceptions import APIException
 from api.models import WebPage
 
 
@@ -122,3 +123,18 @@ class WebPageTestCase(TestCase):
         self.assertEqual(first['url'], interesting_url)
         self.assertIn('publisher', first)
         self.assertIn(first['publisher'], interesting_url)
+
+    def test_invalid_schema_raises_exception(self):
+        url = 'about:debugging'
+        with self.assertRaisesRegex(APIException, "Schéma invalide"):
+            WebPage.from_url(url)
+
+    def test_asking_for_article_being_processed_raises_exception(self):
+        article = WebPage.objects.create(
+            url="https://example.com/article_being_processed",
+            base_domain="example.com",
+            scores_version=WebPage.CURRENT_SCORES_VERSION,
+            total_articles=0
+        )
+        with self.assertRaisesRegex(APIException, "en cours de traitement"):
+            WebPage.from_url(article.url)

@@ -27,3 +27,6 @@ class APIException(Exception):
     def critical(cls, message: str, internal_message: str = None):
         return cls(logging.CRITICAL, message, internal_message)
 
+    def __str__(self):
+        return self.message
+
