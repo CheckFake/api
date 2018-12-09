@@ -194,6 +194,8 @@ class WebPage(models.Model):
         g = Goose({
             'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"
         })
+        blocked_counter = 0
+        too_similar_counter = 0
 
         # Look for similar articles' url
         for link in related_articles['value']:
@@ -207,8 +209,10 @@ class WebPage(models.Model):
 
                     if "You have been blocked" in linked_article.title:
                         logger.debug("Article 'You have been blocked not considered!!!'")
+                        blocked_counter += 1
                     elif SequenceMatcher(None, article.cleaned_text, linked_article.cleaned_text).ratio() > 0.3:
                         logger.debug("Article with content too similar not considered")
+                        too_similar_counter += 1
                     else:
                         new_nouns_article = self.nouns(linked_article.cleaned_text)
                         new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
@@ -230,8 +234,11 @@ class WebPage(models.Model):
         # Calcul du score de l'article
         if nb_articles == 0:
             self.delete()
-            raise APIException.info("Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. "
-                                    "Faites attention!")
+            message = ("Nous n'avons trouvé que des articles trop similaires au vôtre. "
+                       "Il se peut qu'ils proviennent tous de la même source.")
+            if blocked_counter > too_similar_counter:
+                message = "Nous avons trouvé en majorité des articles dont nous n'avons pas pu extraire le contenu."
+            raise APIException.info(message)
         elif interesting_articles == 0:
             content_score = 0
         else:
