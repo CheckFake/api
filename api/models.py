@@ -4,10 +4,12 @@ import logging
 import os
 import re
 from collections import Counter
+from difflib import SequenceMatcher
 from statistics import mean
 from typing import List, Union
 from urllib.parse import urlparse
 
+import goose3
 import requests
 import spacy
 import tldextract
@@ -158,7 +160,7 @@ class WebPage(models.Model):
         logger.debug("Number of interesting nouns : %s", counter_article)
 
         if counter_article > 2:
-            self._compute_content_score(counter_nouns_article, related_articles, counter_article)
+            self._compute_content_score(counter_nouns_article, related_articles, counter_article, article)
         else:
             self.delete()
             raise APIException.warning("Notre méthode de calcul n'a pas pu fournir de résultat sur cet article.")
@@ -181,7 +183,8 @@ class WebPage(models.Model):
 
         return only_same_publisher
 
-    def _compute_content_score(self, counter_nouns_article: Counter, related_articles: dict, counter_article: int) -> None:
+    def _compute_content_score(self, counter_nouns_article: Counter, related_articles: dict,
+                               counter_article: int, article: goose3.article.Article) -> None:
         nb_articles = 0
         interesting_articles = 0
         scores_new_articles = []
@@ -191,6 +194,8 @@ class WebPage(models.Model):
         g = Goose({
             'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"
         })
+        blocked_counter = 0
+        too_similar_counter = 0
 
         # Look for similar articles' url
         for link in related_articles['value']:
@@ -201,7 +206,14 @@ class WebPage(models.Model):
                 try:
                     linked_article = g.extract(url=linked_url)
                     logger.debug("Name of the article: %s", linked_article.title)
-                    if "You have been blocked" not in linked_article.title:
+
+                    if "You have been blocked" in linked_article.title:
+                        logger.debug("Article 'You have been blocked' not considered")
+                        blocked_counter += 1
+                    elif SequenceMatcher(None, article.cleaned_text, linked_article.cleaned_text).ratio() > 0.3:
+                        logger.debug("Article with content too similar not considered")
+                        too_similar_counter += 1
+                    else:
                         new_nouns_article = self.nouns(linked_article.cleaned_text)
                         new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
                         shared_items = [k for k in counter_nouns_article if
@@ -215,14 +227,19 @@ class WebPage(models.Model):
                             logger.debug("Too low score : %s", score_article)
                         nb_articles += 1
                         logger.debug("Percentage for new articles : %s", scores_new_articles)
-                    else:
-                        logger.debug("Article 'You have been blocked not considered!!!'")
                 except (ValueError, LookupError) as e:
                     logger.error("Found page that can't be processed : %s", linked_url)
                     logger.error("Error message : %s", e)
 
         # Calcul du score de l'article
-        if nb_articles == 0 or interesting_articles == 0:
+        if nb_articles == 0:
+            self.delete()
+            message = ("Nous n'avons trouvé que des articles trop similaires au vôtre. "
+                       "Il se peut qu'ils proviennent tous de la même source.")
+            if blocked_counter > too_similar_counter:
+                message = "Nous avons trouvé en majorité des articles dont nous n'avons pas pu extraire le contenu."
+            raise APIException.info(message)
+        elif interesting_articles == 0:
             content_score = 0
         else:
             content_score = ((int(interesting_articles / nb_articles * 1000) / 10)
