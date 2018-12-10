@@ -70,6 +70,6 @@ deploy:
     - curl -X GET "$WEBHOOK_URL"
   environment:
     name: production
-    url: https://fakenewsdetector.augendre.info
+    url: https://api.checkfake.info/api/ping
   only:
     - master

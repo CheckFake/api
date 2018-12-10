@@ -26,7 +26,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', '$a^7vw@ktn0mbnbd5(vs4em-(yy1ufrx$=g@r6ihbc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_ENV', 'prod') == 'dev'
 
-ALLOWED_HOSTS = ['fakenewsdetector.augendre.info', 'web', 'fakenewsdetector', '127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['fakenewsdetector.augendre.info', 'web', 'fakenewsdetector', '127.0.0.1', 'localhost', 'api.fakecheck.info']
 if DEBUG:
     ALLOWED_HOSTS.extend([
         os.getenv('CURRENT_IP', '192.168.1.27'),
@@ -37,7 +37,7 @@ if host:
 
 ADMINS = [('Gabriel', os.getenv('ADMIN_EMAIL')), ]
 SERVER_EMAIL = os.getenv('SERVER_EMAIL')
-EMAIL_SUBJECT_PREFIX = '[Fake News Detector API] '
+EMAIL_SUBJECT_PREFIX = '[CheckFake API] '
 
 
 # Application definition
