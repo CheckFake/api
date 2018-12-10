@@ -126,7 +126,7 @@ class WebPageTestCase(TestCase):
 
     def test_invalid_schema_raises_exception(self):
         url = 'about:debugging'
-        with self.assertRaisesRegex(APIException, "Schéma invalide"):
+        with self.assertRaisesRegex(APIException, "Adresse invalide"):
             WebPage.from_url(url)
 
     def test_asking_for_article_being_processed_raises_exception(self):
