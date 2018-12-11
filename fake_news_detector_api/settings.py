@@ -26,7 +26,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', '$a^7vw@ktn0mbnbd5(vs4em-(yy1ufrx$=g@r6ihbc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_ENV', 'prod') == 'dev'
 
-ALLOWED_HOSTS = ['fakenewsdetector.augendre.info', 'web', 'fakenewsdetector', '127.0.0.1', 'localhost', 'api.fakecheck.info']
+ALLOWED_HOSTS = ['fakenewsdetector.augendre.info', 'web', 'fakenewsdetector', '127.0.0.1', 'localhost', 'api.checkfake.info']
 if DEBUG:
     ALLOWED_HOSTS.extend([
         os.getenv('CURRENT_IP', '192.168.1.27'),
