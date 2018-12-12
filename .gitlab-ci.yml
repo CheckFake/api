@@ -10,17 +10,57 @@ variables:
 before_script:
   - docker login -u gitlab-ci-token -p $CI_JOB_TOKEN $CI_REGISTRY
 
-build-master:
+build:
   stage: build
   script:
     - docker pull $CI_REGISTRY_IMAGE:latest || true
     - docker pull $CONTAINER_TEST_IMAGE || true
-    - docker build --cache-from $CI_REGISTRY_IMAGE:latest --cache-from $CONTAINER_TEST_IMAGE -t $CONTAINER_TEST_IMAGE -t $CI_REGISTRY_IMAGE:latest .
+    - docker pull $CI_REGISTRY_IMAGE:master || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:latest --cache-from $CONTAINER_TEST_IMAGE --cache-from $CI_REGISTRY_IMAGE:master -t $CONTAINER_TEST_IMAGE -t $CI_REGISTRY_IMAGE:latest .
     - docker push $CONTAINER_TEST_IMAGE
     - docker push $CI_REGISTRY_IMAGE:latest
 
+smoke-test:
+  stage: test
+  image: $CONTAINER_TEST_IMAGE
+  services:
+    - postgres:9.6-alpine
+  variables:
+    DATABASE_URL: postgres://postgres:postgres@postgres/postgres
+    SECRET_KEY: test
+    GIT_STRATEGY: none
+  before_script:
+    - echo "overriding docker login"
+  script:
+    - cd /app
+    - pipenv run python manage.py migrate
+    - LOAD_NLP="True" pipenv run gunicorn fake_news_detector_api.wsgi -b 0.0.0.0:8000 -t 600 -k gthread --threads 4 --log-file - &
+    - sleep 15 && pipenv run python smoke_test.py
+
+tests:
+  stage: test
+  image: $CONTAINER_TEST_IMAGE
+  services:
+    - postgres:9.6-alpine
+  variables:
+    DATABASE_URL: postgres://postgres:postgres@postgres/postgres
+    SECRET_KEY: test
+    GIT_STRATEGY: none
+  before_script:
+    - echo "overriding docker login"
+  script:
+    - cd /app
+    - pipenv run python manage.py migrate
+    - pipenv run coverage run --source='.' manage.py test
+    - pipenv run coverage report
+
 deploy:
   stage: deploy
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_DRIVER: overlay2
+    CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG
+    GIT_STRATEGY: none
   script:
     - docker pull $CONTAINER_TEST_IMAGE
     - docker tag $CONTAINER_TEST_IMAGE $DOCKER_HUB_IMAGE
@@ -30,6 +70,6 @@ deploy:
     - curl -X GET "$WEBHOOK_URL"
   environment:
     name: production
-    url: https://fakenewsdetector.augendre.info
+    url: https://api.checkfake.info/api/ping
   only:
     - master

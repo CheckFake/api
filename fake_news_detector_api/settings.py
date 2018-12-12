@@ -26,7 +26,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', '$a^7vw@ktn0mbnbd5(vs4em-(yy1ufrx$=g@r6ihbc
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_ENV', 'prod') == 'dev'
 
-ALLOWED_HOSTS = ['fakenewsdetector.augendre.info', 'web', 'fakenewsdetector', '127.0.0.1', 'localhost']
+ALLOWED_HOSTS = ['fakenewsdetector.augendre.info', 'web', 'fakenewsdetector', '127.0.0.1', 'localhost', 'api.checkfake.info']
 if DEBUG:
     ALLOWED_HOSTS.extend([
         os.getenv('CURRENT_IP', '192.168.1.27'),
@@ -37,7 +37,7 @@ if host:
 
 ADMINS = [('Gabriel', os.getenv('ADMIN_EMAIL')), ]
 SERVER_EMAIL = os.getenv('SERVER_EMAIL')
-EMAIL_SUBJECT_PREFIX = '[Fake News Detector API] '
+EMAIL_SUBJECT_PREFIX = '[CheckFake API] '
 
 
 # Application definition
@@ -120,6 +120,11 @@ LOG_LEVEL = 'DEBUG' if DEBUG else 'INFO'
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+    },
     'formatters': {
         'verbose': {
             'format': '[%(asctime)s] [%(process)d] [%(levelname)s] %(module)s - %(message)s'
@@ -132,6 +137,7 @@ LOGGING = {
         },
         'mail_admins': {
             'level': 'ERROR',
+            'filters': ['require_debug_false'],
             'class': 'django.utils.log.AdminEmailHandler'
         }
     },

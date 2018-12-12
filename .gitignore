@@ -115,3 +115,5 @@ fabric.properties
 *.pyc
 __pycache__
 public_suffixes_list.dat
+.coverage
+htmlcov

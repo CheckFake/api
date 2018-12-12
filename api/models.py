@@ -4,15 +4,18 @@ import logging
 import os
 import re
 from collections import Counter
+from difflib import SequenceMatcher
 from statistics import mean
+from typing import List, Union
 from urllib.parse import urlparse
 
+import goose3
 import requests
 import spacy
 import tldextract
 from django.conf import settings
 from django.db import models
-from django.db.models import Avg
+from django.db.models import Avg, QuerySet
 from django.utils import timezone
 from goose3 import Goose
 from nltk.stem.snowball import SnowballStemmer
@@ -31,7 +34,7 @@ if settings.LOAD_NLP:
     logger.debug("Finished loading NLP")
 
 
-def get_related_articles(article, delay):
+def get_related_articles(article, delay) -> dict:
     title = article.title
     logger.debug("Title of the article : %s", title)
     # Construct the url for the GET request
@@ -67,34 +70,34 @@ class WebPage(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    def _site_score_queryset(self):
+    def _site_score_queryset(self) -> Union[QuerySet, List['WebPage']]:
         return (WebPage.objects
                 .filter(base_domain=self.base_domain)
                 .filter(scores_version=WebPage.CURRENT_SCORES_VERSION))
 
     @property
-    def site_score_articles_count(self):
+    def site_score_articles_count(self) -> int:
         return self._site_score_queryset().count()
 
     @property
-    def interesting_related_articles_count(self):
+    def interesting_related_articles_count(self) -> int:
         return self.interesting_related_articles.count()
 
     @property
-    def site_score(self):
+    def site_score(self) -> float:
         raw_site_score = (self._site_score_queryset()
                           .aggregate(site_score=Avg('content_score'))
                           )['site_score']
         return int(raw_site_score * 10) / 10
 
     @property
-    def global_score(self):
+    def global_score(self) -> float:
         # allows to focus on the content if the site is "serious" and to focus on the site otherwise
         final_score = (100 - self.site_score) / 100 * self.site_score + self.site_score * self.content_score / 100
         return int(final_score * 10) / 10
 
     @staticmethod
-    def tokens(text):
+    def tokens(text) -> List[str]:
         root_words = []
         stemmer = SnowballStemmer("french")
         for i in range(len(text)):
@@ -102,7 +105,7 @@ class WebPage(models.Model):
         return root_words
 
     @staticmethod
-    def nouns(text):
+    def nouns(text) -> List[str]:
         nouns = []
         articleWithoutSpecialCaracters = unidecode(text)
         document = re.sub('[^A-Za-z .\-]+', ' ', articleWithoutSpecialCaracters)
@@ -111,7 +114,7 @@ class WebPage(models.Model):
         nouns += [w.text for w in doc if ((w.pos_ == "NOUN" or w.pos_ == "PROPN") and len(w.text) > 1)]
         return nouns
 
-    def compute_scores(self):
+    def compute_scores(self) -> 'WebPage':
         logger.debug("Start compute_scores")
         # Extract the title and the text of the article
         g = Goose({
@@ -121,7 +124,7 @@ class WebPage(models.Model):
             article = g.extract(url=self.url)
         except InvalidSchema:
             self.delete()
-            return f"Schéma invalide"
+            raise APIException.warning("Adresse invalide")
 
         # article_counter = Counter(self.tokens(article.cleaned_text))
 
@@ -157,7 +160,7 @@ class WebPage(models.Model):
         logger.debug("Number of interesting nouns : %s", counter_article)
 
         if counter_article > 2:
-            self._compute_content_score(counter_nouns_article, related_articles, counter_article)
+            self._compute_content_score(counter_nouns_article, related_articles, counter_article, article)
         else:
             self.delete()
             raise APIException.warning("Notre méthode de calcul n'a pas pu fournir de résultat sur cet article.")
@@ -167,17 +170,21 @@ class WebPage(models.Model):
         logger.info(f"Finished computing scores for article {self.url}")
         return self
 
-    def check_same_publisher(self, related_articles):
-        only_same_publisher = False
-        if len(related_articles["value"]) == 1:
-            linked_url = related_articles["value"][0]['url']
-            logger.debug("Found URL for len(related_articles) == 1: %s", linked_url)
+    def check_same_publisher(self, related_articles: dict) -> bool:
+        if not related_articles["value"]:
+            return False
+
+        only_same_publisher = True
+        for article in related_articles["value"]:
+            linked_url = article['url']
             parsed_uri = urlparse(self.url)
-            if parsed_uri.netloc in linked_url:
-                only_same_publisher = True
+            if parsed_uri.netloc not in linked_url:
+                only_same_publisher &= False
+
         return only_same_publisher
 
-    def _compute_content_score(self, counter_nouns_article, related_articles, counter_article):
+    def _compute_content_score(self, counter_nouns_article: Counter, related_articles: dict,
+                               counter_article: int, article: goose3.article.Article) -> None:
         nb_articles = 0
         interesting_articles = 0
         scores_new_articles = []
@@ -187,6 +194,8 @@ class WebPage(models.Model):
         g = Goose({
             'browser_user_agent': "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:64.0) Gecko/20100101 Firefox/64.0"
         })
+        blocked_counter = 0
+        too_similar_counter = 0
 
         # Look for similar articles' url
         for link in related_articles['value']:
@@ -197,7 +206,14 @@ class WebPage(models.Model):
                 try:
                     linked_article = g.extract(url=linked_url)
                     logger.debug("Name of the article: %s", linked_article.title)
-                    if "You have been blocked" not in linked_article.title:
+
+                    if "You have been blocked" in linked_article.title:
+                        logger.debug("Article 'You have been blocked' not considered")
+                        blocked_counter += 1
+                    elif SequenceMatcher(None, article.cleaned_text, linked_article.cleaned_text).ratio() > 0.3:
+                        logger.debug("Article with content too similar not considered")
+                        too_similar_counter += 1
+                    else:
                         new_nouns_article = self.nouns(linked_article.cleaned_text)
                         new_counter_nouns_articles = Counter(self.tokens(new_nouns_article))
                         shared_items = [k for k in counter_nouns_article if
@@ -211,14 +227,19 @@ class WebPage(models.Model):
                             logger.debug("Too low score : %s", score_article)
                         nb_articles += 1
                         logger.debug("Percentage for new articles : %s", scores_new_articles)
-                    else:
-                        logger.debug("Article 'You have been blocked not considered!!!'")
                 except (ValueError, LookupError) as e:
                     logger.error("Found page that can't be processed : %s", linked_url)
                     logger.error("Error message : %s", e)
 
         # Calcul du score de l'article
-        if nb_articles == 0 or interesting_articles == 0:
+        if nb_articles == 0:
+            self.delete()
+            message = ("Nous n'avons trouvé que des articles trop similaires au vôtre. "
+                       "Il se peut qu'ils proviennent tous de la même source.")
+            if blocked_counter > too_similar_counter:
+                message = "Nous avons trouvé en majorité des articles dont nous n'avons pas pu extraire le contenu."
+            raise APIException.info(message)
+        elif interesting_articles == 0:
             content_score = 0
         else:
             content_score = ((int(interesting_articles / nb_articles * 1000) / 10)
@@ -229,13 +250,13 @@ class WebPage(models.Model):
         self.total_articles = nb_articles
         self._store_interesting_related_articles(dict_interesting_articles)
 
-    def _store_interesting_related_articles(self, dict_interesting_articles):
+    def _store_interesting_related_articles(self, dict_interesting_articles: dict) -> None:
         InterestingRelatedArticle.objects.filter(web_page=self).delete()
         for url, (title, score) in dict_interesting_articles.items():
             score = int(score * 100)
             InterestingRelatedArticle.objects.create(title=title, url=url, score=score, web_page=self)
 
-    def to_dict(self):
+    def to_dict(self) -> dict:
         fields_to_serialize = [
             'url', 'global_score', 'total_articles',
             'site_score_articles_count', 'interesting_related_articles_count'
@@ -262,7 +283,7 @@ class WebPage(models.Model):
         return self_serialized
 
     @classmethod
-    def from_url(cls, url):
+    def from_url(cls, url: str) -> 'WebPage':
         existing = cls.objects.filter(url=url).first()
 
         if existing and existing.content_score is None:
