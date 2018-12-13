@@ -59,12 +59,33 @@ def get_related_articles(article, delay) -> dict:
     return {'value': []}
 
 
+def extract_base_domain(url, tld_extract=None):
+    if tld_extract is None:
+        tld_extract = tldextract.TLDExtract(
+            cache_file='api/external_data/public_suffixes_list.dat',
+            include_psl_private_domains=True
+        )
+    url_extraction = tld_extract(url)
+    return f"{url_extraction.domain}.{url_extraction.suffix}".lower()
+
+
+class BaseDomain(models.Model):
+    base_domain = models.CharField(max_length=250)
+
+    @property
+    def isolated_articles_count(self):
+        return self.isolated_articles.count()
+
+    def __str__(self):
+        return self.base_domain
+
+
 class WebPage(models.Model):
-    CURRENT_SCORES_VERSION = 13
+    CURRENT_SCORES_VERSION = 14
 
     url = models.URLField(unique=True, max_length=500)
     content_score = models.PositiveIntegerField(blank=True, null=True)
-    base_domain = models.CharField(max_length=250)
+    base_domain = models.ForeignKey(BaseDomain, on_delete=models.PROTECT, related_name='web_pages')
     scores_version = models.PositiveIntegerField()
     total_articles = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -72,8 +93,8 @@ class WebPage(models.Model):
 
     def _site_score_queryset(self) -> Union[QuerySet, List['WebPage']]:
         return (WebPage.objects
-                .filter(base_domain=self.base_domain)
-                .filter(scores_version=WebPage.CURRENT_SCORES_VERSION))
+                .filter(scores_version=WebPage.CURRENT_SCORES_VERSION)
+                .filter(base_domain=self.base_domain))
 
     @property
     def site_score_articles_count(self) -> int:
@@ -147,6 +168,7 @@ class WebPage(models.Model):
 
             only_same_publisher = self.check_same_publisher(related_articles)
             if not related_articles["value"] or only_same_publisher is True:
+                isolated, created = IsolatedArticle.objects.get_or_create(url=self.url, base_domain=self.base_domain)
                 self.delete()
                 raise APIException.info("Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. "
                                         "Faites attention!")
@@ -252,9 +274,17 @@ class WebPage(models.Model):
 
     def _store_interesting_related_articles(self, dict_interesting_articles: dict) -> None:
         InterestingRelatedArticle.objects.filter(web_page=self).delete()
+        tld_extract = tldextract.TLDExtract(
+            cache_file='api/external_data/public_suffixes_list.dat',
+            include_psl_private_domains=True
+        )
         for url, (title, score) in dict_interesting_articles.items():
             score = int(score * 100)
-            InterestingRelatedArticle.objects.create(title=title, url=url, score=score, web_page=self)
+            base_domain, created = BaseDomain.objects.get_or_create(base_domain=extract_base_domain(url, tld_extract))
+            InterestingRelatedArticle.objects.create(
+                title=title, url=url, score=score,
+                web_page=self, base_domain=base_domain
+            )
 
     def to_dict(self) -> dict:
         fields_to_serialize = [
@@ -272,8 +302,7 @@ class WebPage(models.Model):
             include_psl_private_domains=True
         )
         for article in self.interesting_related_articles.order_by('-score')[:3]:
-            url_extraction = tld_extract(article.url)
-            base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
+            base_domain = extract_base_domain(article.url, tld_extract)
             self_serialized['related_articles_selection'].append({
                 'title': article.title,
                 'url': article.url,
@@ -296,17 +325,13 @@ class WebPage(models.Model):
             return existing
 
         elif not existing:
-            tld_extract = tldextract.TLDExtract(
-                cache_file='api/external_data/public_suffixes_list.dat',
-                include_psl_private_domains=True
-            )
-            url_extraction = tld_extract(url)
-            base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
+            base_domain = extract_base_domain(url)
             logger.debug(f"Base domain found {base_domain}")
+            domain, created = BaseDomain.objects.get_or_create(base_domain=base_domain)
             existing = cls.objects.create(
                 url=url,
                 scores_version=WebPage.CURRENT_SCORES_VERSION,
-                base_domain=base_domain,
+                base_domain=domain,
                 total_articles=0
             )
 
@@ -327,3 +352,11 @@ class InterestingRelatedArticle(models.Model):
     url = models.URLField(max_length=500)
     score = models.PositiveIntegerField()
     web_page = models.ForeignKey(WebPage, on_delete=models.CASCADE, related_name='interesting_related_articles')
+    base_domain = models.ForeignKey(BaseDomain, on_delete=models.PROTECT, related_name='interesting_related_articles')
+
+
+class IsolatedArticle(models.Model):
+    url = models.URLField(max_length=500, unique=True)
+    base_domain = models.ForeignKey(BaseDomain, on_delete=models.PROTECT, related_name='isolated_articles')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
