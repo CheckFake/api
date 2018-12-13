@@ -71,7 +71,10 @@ def extract_base_domain(url, tld_extract=None):
 
 class BaseDomain(models.Model):
     base_domain = models.CharField(max_length=250)
-    isolated_articles_count = models.PositiveIntegerField(blank=True, default=0)
+
+    @property
+    def isolated_articles_count(self):
+        return self.isolated_articles.count()
 
     def __str__(self):
         return self.base_domain
@@ -165,6 +168,7 @@ class WebPage(models.Model):
 
             only_same_publisher = self.check_same_publisher(related_articles)
             if not related_articles["value"] or only_same_publisher is True:
+                isolated, created = IsolatedArticle.objects.get_or_create(url=self.url, base_domain=self.base_domain)
                 self.delete()
                 raise APIException.info("Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. "
                                         "Faites attention!")
@@ -276,7 +280,7 @@ class WebPage(models.Model):
         )
         for url, (title, score) in dict_interesting_articles.items():
             score = int(score * 100)
-            base_domain = BaseDomain.objects.get_or_create(base_domain=extract_base_domain(url, tld_extract))
+            base_domain, created = BaseDomain.objects.get_or_create(base_domain=extract_base_domain(url, tld_extract))
             InterestingRelatedArticle.objects.create(
                 title=title, url=url, score=score,
                 web_page=self, base_domain=base_domain
@@ -349,3 +353,10 @@ class InterestingRelatedArticle(models.Model):
     score = models.PositiveIntegerField()
     web_page = models.ForeignKey(WebPage, on_delete=models.CASCADE, related_name='interesting_related_articles')
     base_domain = models.ForeignKey(BaseDomain, on_delete=models.PROTECT, related_name='interesting_related_articles')
+
+
+class IsolatedArticle(models.Model):
+    url = models.URLField(max_length=500, unique=True)
+    base_domain = models.ForeignKey(BaseDomain, on_delete=models.PROTECT, related_name='isolated_articles')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
