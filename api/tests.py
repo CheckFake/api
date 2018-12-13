@@ -1,15 +1,16 @@
 from django.test import TestCase
 
 from api.exceptions import APIException
-from api.models import WebPage
+from api.models import WebPage, BaseDomain
 
 
 class WebPageTestCase(TestCase):
     def setUp(self):
+        domain, created = BaseDomain.objects.get_or_create(base_domain="example.com")
         self.page = WebPage.objects.create(
             url="https://example.com/article",
             content_score=50,
-            base_domain="example.com",
+            base_domain=domain,
             scores_version=WebPage.CURRENT_SCORES_VERSION,
             total_articles=5
         )
@@ -130,9 +131,10 @@ class WebPageTestCase(TestCase):
             WebPage.from_url(url)
 
     def test_asking_for_article_being_processed_raises_exception(self):
+        domain, created = BaseDomain.objects.get_or_create(base_domain="example.com")
         article = WebPage.objects.create(
             url="https://example.com/article_being_processed",
-            base_domain="example.com",
+            base_domain=domain,
             scores_version=WebPage.CURRENT_SCORES_VERSION,
             total_articles=0
         )

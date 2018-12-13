@@ -59,12 +59,16 @@ def get_related_articles(article, delay) -> dict:
     return {'value': []}
 
 
+class BaseDomain(models.Model):
+    base_domain = models.CharField(max_length=250)
+
+
 class WebPage(models.Model):
-    CURRENT_SCORES_VERSION = 13
+    CURRENT_SCORES_VERSION = 14
 
     url = models.URLField(unique=True, max_length=500)
     content_score = models.PositiveIntegerField(blank=True, null=True)
-    base_domain = models.CharField(max_length=250)
+    base_domain = models.ForeignKey(BaseDomain, on_delete=models.PROTECT, related_name='web_pages')
     scores_version = models.PositiveIntegerField()
     total_articles = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
@@ -72,8 +76,8 @@ class WebPage(models.Model):
 
     def _site_score_queryset(self) -> Union[QuerySet, List['WebPage']]:
         return (WebPage.objects
-                .filter(base_domain=self.base_domain)
-                .filter(scores_version=WebPage.CURRENT_SCORES_VERSION))
+                .filter(scores_version=WebPage.CURRENT_SCORES_VERSION)
+                .filter(base_domain=self.base_domain))
 
     @property
     def site_score_articles_count(self) -> int:
@@ -303,10 +307,11 @@ class WebPage(models.Model):
             url_extraction = tld_extract(url)
             base_domain = f"{url_extraction.domain}.{url_extraction.suffix}".lower()
             logger.debug(f"Base domain found {base_domain}")
+            domain, created = BaseDomain.objects.get_or_create(base_domain=base_domain)
             existing = cls.objects.create(
                 url=url,
                 scores_version=WebPage.CURRENT_SCORES_VERSION,
-                base_domain=base_domain,
+                base_domain=domain,
                 total_articles=0
             )
 
