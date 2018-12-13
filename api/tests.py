@@ -105,6 +105,8 @@ class WebPageTestCase(TestCase):
         self.assertEqual(result['scores']['content_score'], self.page.content_score)
         self.assertIn('site_score', result["scores"])
         self.assertEqual(result['scores']['site_score'], self.page.site_score)
+        self.assertIn('isolated_articles_score', result["scores"])
+        self.assertEqual(result['scores']['isolated_articles_score'], self.page.isolated_articles_score)
 
     def test_to_dict_related_articles_selection(self):
         interesting_url = 'https://toto.com/otherarticle2'

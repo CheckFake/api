@@ -76,6 +76,14 @@ class BaseDomain(models.Model):
     def isolated_articles_count(self):
         return self.isolated_articles.count()
 
+    @property
+    def total_articles_count(self):
+        return self.isolated_articles_count + self.web_pages.count()
+
+    @property
+    def isolated_articles_ratio(self):
+        return self.isolated_articles_count / self.total_articles_count
+
     def __str__(self):
         return self.base_domain
 
@@ -110,6 +118,10 @@ class WebPage(models.Model):
                           .aggregate(site_score=Avg('content_score'))
                           )['site_score']
         return int(raw_site_score * 10) / 10
+
+    @property
+    def isolated_articles_score(self):
+        return int((1 - self.base_domain.isolated_articles_ratio) * 1000) / 10
 
     @property
     def global_score(self) -> float:
@@ -293,7 +305,7 @@ class WebPage(models.Model):
         ]
         self_serialized = {field: getattr(self, field) for field in fields_to_serialize}
 
-        scores = ['content_score', 'site_score']
+        scores = ['content_score', 'site_score', 'isolated_articles_score']
         self_serialized['scores'] = {field: getattr(self, field) for field in scores}
 
         self_serialized['related_articles_selection'] = []
