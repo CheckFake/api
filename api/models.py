@@ -158,6 +158,9 @@ class WebPage(models.Model):
         except InvalidSchema:
             self.delete()
             raise APIException.warning("Adresse invalide")
+        except RequestException:
+            self.delete()
+            raise APIException.warning("Le site n'est pas joignable")
 
         # article_counter = Counter(self.tokens(article.cleaned_text))
 
