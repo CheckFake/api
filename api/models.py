@@ -19,7 +19,7 @@ from django.db.models import Avg, QuerySet
 from django.utils import timezone
 from goose3 import Goose
 from nltk.stem.snowball import SnowballStemmer
-from requests.exceptions import InvalidSchema
+from requests.exceptions import InvalidSchema, RequestException
 from unidecode import unidecode
 
 from api.exceptions import APIException
@@ -158,6 +158,9 @@ class WebPage(models.Model):
         except InvalidSchema:
             self.delete()
             raise APIException.warning("Adresse invalide")
+        except RequestException:
+            self.delete()
+            raise APIException.warning("Le site n'est pas joignable")
 
         # article_counter = Counter(self.tokens(article.cleaned_text))
 
@@ -261,9 +264,8 @@ class WebPage(models.Model):
                             logger.debug("Too low score : %s", score_article)
                         nb_articles += 1
                         logger.debug("Percentage for new articles : %s", scores_new_articles)
-                except (ValueError, LookupError) as e:
-                    logger.error("Found page that can't be processed : %s", linked_url)
-                    logger.error("Error message : %s", e)
+                except (ValueError, LookupError, RequestException) as e:
+                    logger.error(f"Found page that can't be processed : {linked_url} with error message {e}")
 
         # Calcul du score de l'article
         if nb_articles == 0:
