@@ -265,8 +265,7 @@ class WebPage(models.Model):
                         nb_articles += 1
                         logger.debug("Percentage for new articles : %s", scores_new_articles)
                 except (ValueError, LookupError, RequestException) as e:
-                    logger.error("Found page that can't be processed : %s", linked_url)
-                    logger.error("Error message : %s", e)
+                    logger.error(f"Found page that can't be processed : {linked_url} with error message {e}")
 
         # Calcul du score de l'article
         if nb_articles == 0:
