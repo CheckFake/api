@@ -38,21 +38,35 @@ def get_related_articles(article, delay) -> dict:
     title = article.title
     logger.debug("Title of the article : %s", title)
     # Construct the url for the GET request
-    base_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
-    params = {
+    news_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
+    news_params = {
         "q": title,
-        "sortBy": "date",
+        "sortBy": "date"
     }
+    search_url = "https://api.cognitive.microsoft.com/bing/v7.0/search"
+    params = {
+        "q":title
+    }
+
+    #need better imbrications of if
     if article.publish_datetime_utc is not None:
-        params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delay)).timestamp()
+        news_params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delay)).timestamp()
         logger.debug("Added since param")
-    response = requests.get(
-        url=base_url,
-        params=params,
-        headers={
-            "Ocp-Apim-Subscription-Key": os.getenv("BING_SEARCH_API_KEY"),
-        },
-    )
+    if (datetime.datetime.now() - article.publish_datetime_utc) < delay:
+        response = requests.get(
+            url=news_url,
+            params=news_params,
+            headers={
+                "Ocp-Apim-Subscription-Key": os.getenv("BING_SEARCH_API_KEY"),
+            },
+        )
+    else:
+        response = requests.get(
+            url=search_url,
+            params=search_params,
+            headers={
+                "Ocp-Apim-Subscription-Key" #: aKey,
+            },
     if response.status_code == 200:
         return response.json()
 
