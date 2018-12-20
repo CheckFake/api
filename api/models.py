@@ -84,6 +84,13 @@ class BaseDomain(models.Model):
     def isolated_articles_ratio(self):
         return self.isolated_articles_count / self.total_articles_count
 
+    @property
+    def site_score(self):
+        return (WebPage.objects
+                .filter(scores_version=WebPage.CURRENT_SCORES_VERSION)
+                .filter(base_domain=self)
+                .aggregate(site_score=Avg('content_score'))['site_score'])
+
     def __str__(self):
         return self.base_domain
 
