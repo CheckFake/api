@@ -26,6 +26,9 @@ from api.exceptions import APIException
 
 logger = logging.getLogger(__name__)
 
+news_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
+search_url = "https://api.cognitive.microsoft.com/bing/v7.0/search"
+
 if settings.LOAD_NLP:
     logger.debug("loading NLP")
     nlp = spacy.load('fr')
@@ -38,35 +41,32 @@ def get_related_articles(article, delay) -> dict:
     title = article.title
     logger.debug("Title of the article : %s", title)
     # Construct the url for the GET request
-    news_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
-    news_params = {
-        "q": title,
-        "sortBy": "date"
-    }
-    search_url = "https://api.cognitive.microsoft.com/bing/v7.0/search"
+
+    # By default we use the search api, so if we don't have a date we can have a wider search
+    url = search_url
     params = {
-        "q":title
+        "q": title
     }
 
-    #need better imbrications of if
     if article.publish_datetime_utc is not None:
-        news_params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delay)).timestamp()
-        logger.debug("Added since param")
-    if (datetime.datetime.now() - article.publish_datetime_utc) < delay:
-        response = requests.get(
-            url=news_url,
-            params=news_params,
-            headers={
-                "Ocp-Apim-Subscription-Key": os.getenv("BING_SEARCH_API_KEY"),
-            },
-        )
-    else:
-        response = requests.get(
-            url=search_url,
-            params=search_params,
-            headers={
-                "Ocp-Apim-Subscription-Key" #: aKey,
-            },
+
+        if (datetime.datetime.now() - article.publish_datetime_utc) < datetime.timedelta(days=delay):
+            # if the article was published between than 7 days ago and now we use the news api
+            params['sortBy'] = "date"
+            params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delay)).timestamp()
+            url = news_url
+
+        else:
+            pass
+
+    response = requests.get(
+        url=url,
+        params=params,
+        headers={
+            "Ocp-Apim-Subscription-Key": os.getenv("BING_SEARCH_API_KEY"),
+        })
+
+
     if response.status_code == 200:
         return response.json()
 
