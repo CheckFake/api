@@ -140,7 +140,8 @@ class WebPage(models.Model):
     @property
     def global_score(self) -> float:
         # allows to focus on the content if the site is "serious" and to focus on the site otherwise
-        final_score = (100 - self.site_score) / 100 * self.site_score + self.site_score * self.content_score / 100
+
+        final_score = self.isolated_articles_score/3 + (100 - self.site_score) / 100 * self.site_score/3 + self.site_score * self.content_score / 300
         return int(final_score * 10) / 10
 
     @staticmethod
