@@ -26,8 +26,8 @@ from api.exceptions import APIException
 
 logger = logging.getLogger(__name__)
 
-news_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
-search_url = "https://api.cognitive.microsoft.com/bing/v7.0/search"
+NEWS_URL = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
+SEARCH_URL = "https://api.cognitive.microsoft.com/bing/v7.0/search"
 
 if settings.LOAD_NLP:
     logger.debug("loading NLP")
@@ -43,7 +43,7 @@ def get_related_articles(article, delay) -> dict:
     # Construct the url for the GET request
 
     # By default we use the search api, so if we don't have a date we can have a wider search
-    url = search_url
+    url = SEARCH_URL
     params = {
         "q": title
     }
@@ -51,13 +51,10 @@ def get_related_articles(article, delay) -> dict:
     if article.publish_datetime_utc is not None:
 
         if (datetime.datetime.now() - article.publish_datetime_utc) < datetime.timedelta(days=delay):
-            # if the article was published between than 7 days ago and now we use the news api
+            # if the article was published 7 days ago or later , we use the news api
             params['sortBy'] = "date"
             params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delay)).timestamp()
-            url = news_url
-
-        else:
-            pass
+            url = NEWS_URL
 
     response = requests.get(
         url=url,
