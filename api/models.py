@@ -51,7 +51,7 @@ def get_related_articles(article, delay) -> dict:
     if article.publish_datetime_utc is not None:
 
         if (datetime.datetime.now() - article.publish_datetime_utc) < datetime.timedelta(days=delay):
-            # if the article was published between than 7 days ago and now we use the news api
+             # if the article was published 7 days ago or later, we use the news api
             params['sortBy'] = "date"
             params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delay)).timestamp()
             url = news_url
