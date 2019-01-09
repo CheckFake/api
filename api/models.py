@@ -26,6 +26,9 @@ from api.exceptions import APIException
 
 logger = logging.getLogger(__name__)
 
+NEWS_URL = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
+SEARCH_URL = "https://api.cognitive.microsoft.com/bing/v7.0/search"
+
 if settings.LOAD_NLP:
     logger.debug("loading NLP")
     nlp = spacy.load('fr')
@@ -38,21 +41,29 @@ def get_related_articles(article, delay) -> dict:
     title = article.title
     logger.debug("Title of the article : %s", title)
     # Construct the url for the GET request
-    base_url = "https://api.cognitive.microsoft.com/bing/v7.0/news/search"
+
+    # By default we use the search api, so if we don't have a date we can have a wider search
+    url = SEARCH_URL
     params = {
-        "q": title,
-        "sortBy": "date",
+        "q": title
     }
+
     if article.publish_datetime_utc is not None:
-        params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delay)).timestamp()
-        logger.debug("Added since param")
+
+        if (datetime.datetime.now() - article.publish_datetime_utc) < datetime.timedelta(days=delay):
+             # if the article was published 7 days ago or later , we use the news api
+            params['sortBy'] = "date"
+            params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delay)).timestamp()
+            url = NEWS_URL
+
     response = requests.get(
-        url=base_url,
+        url=url,
         params=params,
         headers={
             "Ocp-Apim-Subscription-Key": os.getenv("BING_SEARCH_API_KEY"),
-        },
-    )
+        })
+
+
     if response.status_code == 200:
         return response.json()
 
@@ -126,7 +137,8 @@ class WebPage(models.Model):
     @property
     def global_score(self) -> float:
         # allows to focus on the content if the site is "serious" and to focus on the site otherwise
-        final_score = (100 - self.site_score) / 100 * self.site_score + self.site_score * self.content_score / 100
+
+        final_score = self.isolated_articles_score/3 + (100 - self.site_score) / 100 * self.site_score/3 + self.site_score * self.content_score / 300
         return int(final_score * 10) / 10
 
     @staticmethod
