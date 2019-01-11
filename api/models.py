@@ -138,7 +138,7 @@ class WebPage(models.Model):
 
         final_score = (self.isolated_articles_score / 2
                        + ((100 - self.site_score) / 100 * self.site_score
-                          + self.site_score * self.content_score / 100)) / 2
+                          + self.site_score * self.content_score / 100) / 2)
         return int(final_score * 10) / 10
 
     @staticmethod
