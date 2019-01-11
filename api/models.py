@@ -49,9 +49,8 @@ def get_related_articles(article, delay) -> dict:
     }
 
     if article.publish_datetime_utc is not None:
-
-        if (datetime.datetime.now() - article.publish_datetime_utc) < datetime.timedelta(days=delay):
-             # if the article was published 7 days ago or later , we use the news api
+        if (timezone.now() - article.publish_datetime_utc) < datetime.timedelta(days=delay):
+            # if the article was published 7 days ago or later , we use the news api
             params['sortBy'] = "date"
             params['since'] = (article.publish_datetime_utc - datetime.timedelta(days=delay)).timestamp()
             url = NEWS_URL
@@ -62,7 +61,6 @@ def get_related_articles(article, delay) -> dict:
         headers={
             "Ocp-Apim-Subscription-Key": os.getenv("BING_SEARCH_API_KEY"),
         })
-
 
     if response.status_code == 200:
         return response.json()
@@ -138,7 +136,9 @@ class WebPage(models.Model):
     def global_score(self) -> float:
         # allows to focus on the content if the site is "serious" and to focus on the site otherwise
 
-        final_score = self.isolated_articles_score/3 + (100 - self.site_score) / 100 * self.site_score/3 + self.site_score * self.content_score / 300
+        final_score = (self.isolated_articles_score / 3
+                       + (100 - self.site_score) / 100 * self.site_score / 3
+                       + self.site_score * self.content_score / 300)
         return int(final_score * 10) / 10
 
     @staticmethod
