@@ -189,12 +189,12 @@ class WebPage(models.Model):
 
         only_same_publisher = self.check_same_publisher(related_articles)
 
-        if not related_articles["value"] or only_same_publisher is True:
+        if not related_articles.get("value") or only_same_publisher is True:
             logger.debug("No article found, try with a period of 30 days before publishing.")
             related_articles = get_related_articles(article, 30)
 
             only_same_publisher = self.check_same_publisher(related_articles)
-            if not related_articles["value"] or only_same_publisher is True:
+            if not related_articles.get("value") or only_same_publisher is True:
                 isolated, created = IsolatedArticle.objects.get_or_create(url=self.url, base_domain=self.base_domain)
                 self.delete()
                 raise APIException.info("Cet article semble isolé, nous n'avons trouvé aucun article en lien avec lui. "
@@ -220,7 +220,7 @@ class WebPage(models.Model):
         return self
 
     def check_same_publisher(self, related_articles: dict) -> bool:
-        if not related_articles["value"]:
+        if not related_articles.get("value"):
             return False
 
         only_same_publisher = True
